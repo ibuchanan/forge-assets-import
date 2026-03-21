@@ -1,0 +1,7 @@
+{
+  "links": {
+    "getStatus": "https://api.atlassian.com/jsm/assets/workspace/514fd9bb-dedc-4512-b251-d72f56a09dc5/v1/importsource/97344de6-2269-4254-91e0-6ffabb210309/configstatus",
+    "start": "https://api.atlassian.com/jsm/assets/workspace/514fd9bb-dedc-4512-b251-d72f56a09dc5/v1/importsource/97344de6-2269-4254-91e0-6ffabb210309/executions",
+    "mapping": "https://api.atlassian.com/jsm/assets/workspace/514fd9bb-dedc-4512-b251-d72f56a09dc5/v1/importsource/97344de6-2269-4254-91e0-6ffabb210309/mapping"
+  }
+}

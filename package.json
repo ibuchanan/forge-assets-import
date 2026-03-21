@@ -1,0 +1,39 @@
+{
+  "name": "explore-forge-assets-import",
+  "version": "1.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "main": "index.ts",
+  "scripts": {
+    "build": "tsc",
+    "changelog": "git cliff",
+    "check": "npm run check & npm run types & npm run test & forge lint & wait",
+    "clean": "rm -rf ./dist",
+    "coverage": "vitest run --coverage",
+    "format": "biome format --write",
+    "generate-types": "openapi-typescript docs/jsm-assets-docs/content/cloud/assets/swagger.json -o src/types/assets-api-generated.d.ts",
+    "lint": "biome lint && forge lint",
+    "test": "vitest",
+    "todo": "grep -rn 'TODO' --exclude='package.json' . --color=auto || echo 'No TODOs found!'",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@forge/bridge": "^5.14",
+    "@forge/events": "^2.1",
+    "@forge/kvs": "^1.5",
+    "@forge/react": "^11.13",
+    "@forge/resolver": "^1.7",
+    "neverthrow": "^8.2",
+    "react": "^18.3"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4",
+    "@types/node": "^25.3",
+    "@vitest/coverage-v8": "^4.1",
+    "archunit": "^2.1",
+    "openapi-typescript": "^7.13",
+    "tsx": "^4.21",
+    "typescript": "^5.9",
+    "vitest": "^4.0"
+  }
+}

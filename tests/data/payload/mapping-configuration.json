@@ -1,0 +1,158 @@
+{
+  "schema": {
+    "objectSchema": {
+      "name": "Product Portfolio",
+      "description": "Strategically balancing our collection of products to maximize overall value.",
+      "objectTypes": [
+        {
+          "externalId": "cmdb::externalId/6731111f-bffd-48ee-b266-ce3d1b2e2132",
+          "name": "Product",
+          "description": "",
+          "inheritance": false,
+          "attributes": [
+            {
+              "externalId": "cmdb::externalId/2df56835-e098-4144-84a7-8a79ba5168c1",
+              "name": "Key",
+              "description": "",
+              "type": "text",
+              "label": false,
+              "minimumCardinality": 1,
+              "maximumCardinality": 1,
+              "unique": false
+            },
+            {
+              "externalId": "cmdb::externalId/8e72b1ed-8bbf-4173-a2ad-4ef9cd3e4fe4",
+              "name": "Name",
+              "description": "The name of the object",
+              "type": "text",
+              "label": true,
+              "minimumCardinality": 1,
+              "maximumCardinality": 1,
+              "unique": false
+            },
+            {
+              "externalId": "cmdb::externalId/cb71e256-2007-42ef-8bad-733ed1a04a29",
+              "name": "Description",
+              "description": "Detailed product description",
+              "type": "text",
+              "label": false,
+              "minimumCardinality": 0,
+              "maximumCardinality": 1,
+              "unique": false
+            },
+            {
+              "externalId": "cmdb::externalId/a21920e5-aeed-4ef3-b73b-db0f9e50500f",
+              "name": "Price",
+              "description": "Product price in USD",
+              "type": "double",
+              "label": false,
+              "minimumCardinality": 0,
+              "maximumCardinality": 1,
+              "unique": false
+            },
+            {
+              "externalId": "cmdb::externalId/db293c4c-6233-451e-8c67-c0c512efd60d",
+              "name": "Category",
+              "description": "Product category",
+              "type": "text",
+              "label": false,
+              "minimumCardinality": 0,
+              "maximumCardinality": 1,
+              "unique": false
+            },
+            {
+              "externalId": "cmdb::externalId/f5c7c8bc-1eae-44c8-b036-9add7fa13b12",
+              "name": "Brand",
+              "description": "Product brand/manufacturer",
+              "type": "text",
+              "label": false,
+              "minimumCardinality": 0,
+              "maximumCardinality": 1,
+              "unique": false
+            },
+            {
+              "externalId": "cmdb::externalId/147ede2c-e6a9-4937-b15b-8c810443a52e",
+              "name": "Rating",
+              "description": "Product rating (0-5)",
+              "type": "double",
+              "label": false,
+              "minimumCardinality": 0,
+              "maximumCardinality": 1,
+              "unique": false
+            },
+            {
+              "externalId": "cmdb::externalId/a868c6e0-51c3-451e-a1a0-1565f4271e7b",
+              "name": "Stock",
+              "description": "Available stock quantity",
+              "type": "integer",
+              "label": false,
+              "minimumCardinality": 0,
+              "maximumCardinality": 1,
+              "unique": false
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "mapping": {
+    "objectTypeMappings": [
+      {
+        "objectTypeExternalId": "cmdb::externalId/6731111f-bffd-48ee-b266-ce3d1b2e2132",
+        "objectTypeName": "Product",
+        "selector": "products",
+        "description": "Mapping for Product objects from DummyJSON API",
+        "attributesMapping": [
+          {
+            "attributeExternalId": "cmdb::externalId/2df56835-e098-4144-84a7-8a79ba5168c1",
+            "attributeName": "Key",
+            "attributeLocators": ["id"],
+            "externalIdPart": true
+          },
+          {
+            "attributeExternalId": "cmdb::externalId/8e72b1ed-8bbf-4173-a2ad-4ef9cd3e4fe4",
+            "attributeName": "Name",
+            "attributeLocators": ["title"],
+            "externalIdPart": false
+          },
+          {
+            "attributeExternalId": "cmdb::externalId/cb71e256-2007-42ef-8bad-733ed1a04a29",
+            "attributeName": "Description",
+            "attributeLocators": ["description"],
+            "externalIdPart": false
+          },
+          {
+            "attributeExternalId": "cmdb::externalId/a21920e5-aeed-4ef3-b73b-db0f9e50500f",
+            "attributeName": "Price",
+            "attributeLocators": ["price"],
+            "externalIdPart": false
+          },
+          {
+            "attributeExternalId": "cmdb::externalId/db293c4c-6233-451e-8c67-c0c512efd60d",
+            "attributeName": "Category",
+            "attributeLocators": ["category"],
+            "externalIdPart": false
+          },
+          {
+            "attributeExternalId": "cmdb::externalId/f5c7c8bc-1eae-44c8-b036-9add7fa13b12",
+            "attributeName": "Brand",
+            "attributeLocators": ["brand"],
+            "externalIdPart": false
+          },
+          {
+            "attributeExternalId": "cmdb::externalId/147ede2c-e6a9-4937-b15b-8c810443a52e",
+            "attributeName": "Rating",
+            "attributeLocators": ["rating"],
+            "externalIdPart": false
+          },
+          {
+            "attributeExternalId": "cmdb::externalId/a868c6e0-51c3-451e-a1a0-1565f4271e7b",
+            "attributeName": "Stock",
+            "attributeLocators": ["stock"],
+            "externalIdPart": false
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,786 @@
+/**
+ * Backend resolver for building mapping configuration
+ *
+ * This resolver handles the mapping configuration logic in the backend
+ * where we have proper logging and can debug Assets API responses.
+ */
+
+import api, { route } from "@forge/api";
+import { logStructured } from "../forge/logging";
+import type { ProblemDetails } from "../util/error";
+import {
+  extractOrCreateProblemDetails,
+  ok,
+  okAsync,
+  ResultAsync,
+  StandardError,
+  validateHttpResponse,
+} from "../util/error";
+
+/**
+ * Request payload from frontend for building mapping
+ */
+export interface BuildMappingRequest {
+  payload: {
+    workspaceId: string;
+    schemaId: string;
+    importId: string;
+  };
+  context?: unknown;
+}
+
+/**
+ * Request payload from frontend for submitting mapping
+ */
+export interface SubmitMappingRequest {
+  payload: {
+    workspaceId: string;
+    importId: string;
+    mapping: {
+      schema: {
+        objectSchema: {
+          name: string;
+          description: string;
+          objectTypes: Array<{
+            externalId: string;
+            name: string;
+            description: string;
+            attributes: Array<{
+              externalId: string;
+              name: string;
+              description: string;
+              type: string;
+              minimumCardinality: number;
+              maximumCardinality: number;
+              unique: boolean;
+            }>;
+          }>;
+        };
+      };
+      mapping: {
+        objectTypeMappings: Array<{
+          objectTypeExternalId: string;
+          objectTypeName: string;
+          selector: string;
+          description: string;
+          attributesMapping: Array<{
+            attributeExternalId: string;
+            attributeName: string;
+            attributeLocators: string[];
+            externalIdPart?: boolean;
+          }>;
+        }>;
+      };
+    };
+  };
+  context?: unknown;
+}
+
+/**
+ * Mapping between DummyJSON product fields and Assets attributes
+ */
+export const FIELD_TO_ATTRIBUTE_MAP: Record<string, string> = {
+  id: "Key", // Product ID as unique identifier
+  title: "Name",
+  description: "Description",
+  price: "Price",
+  category: "Category",
+  brand: "Brand",
+  rating: "Rating",
+  stock: "Stock",
+};
+
+/**
+ * Schema and Mapping response from Assets Import API
+ */
+interface SchemaAndMappingResponse {
+  schema?: {
+    objectSchema?: {
+      name?: string;
+      description?: string;
+      objectTypes?: Array<{
+        externalId?: string;
+        name: string;
+        description?: string;
+        attributes?: Array<{
+          externalId?: string;
+          name: string;
+          description?: string;
+          type?: string;
+          minimumCardinality?: number;
+          maximumCardinality?: number;
+          unique?: boolean;
+        }>;
+      }>;
+    };
+  };
+  mapping?: {
+    objectTypeMappings?: Array<{
+      objectTypeExternalId?: string;
+      objectTypeName?: string;
+      selector?: string;
+      description?: string;
+      attributesMapping?: Array<{
+        attributeExternalId?: string;
+        attributeName?: string;
+        attributeLocators?: string[];
+        externalIdPart?: boolean;
+      }>;
+    }>;
+  };
+}
+
+/**
+ * Fetch existing schema and mapping from Assets Import API
+ * This returns the external IDs that Assets has already assigned
+ */
+function fetchSchemaAndMapping(
+  workspaceId: string,
+  importId: string,
+): ResultAsync<SchemaAndMappingResponse, ProblemDetails> {
+  const endpoint = route`/jsm/assets/workspace/${workspaceId}/v1/importsource/${importId}/schema-and-mapping`;
+
+  return ResultAsync.fromPromise(
+    api.asApp().requestJira(endpoint, {
+      headers: {
+        Accept: "application/json",
+      },
+    }),
+    (error: unknown): ProblemDetails =>
+      extractOrCreateProblemDetails(error, "fetching schema and mapping"),
+  )
+    .andThen((response) => {
+      return validateHttpResponse(response, "fetch schema and mapping");
+    })
+    .andThen((validatedResponse) =>
+      ResultAsync.fromPromise(
+        validatedResponse.json() as Promise<SchemaAndMappingResponse>,
+        (error: unknown): ProblemDetails =>
+          extractOrCreateProblemDetails(
+            error,
+            "parsing schema and mapping JSON",
+          ),
+      ),
+    );
+}
+
+/**
+ * Build attribute mappings using existing external IDs from Assets
+ */
+function buildAttributesMappings(objectType: {
+  externalId?: string;
+  name: string;
+  attributes?: Array<{
+    externalId?: string;
+    name: string;
+  }>;
+}): ResultAsync<
+  Array<{
+    attributeExternalId: string;
+    attributeName: string;
+    attributeLocators: string[];
+    externalIdPart?: boolean;
+  }>,
+  ProblemDetails
+> {
+  const attributes = objectType.attributes || [];
+
+  if (attributes.length === 0) {
+    const errorResult = StandardError.getOrDefault(416).error(
+      `Object type '${objectType.name}' has no attributes. Please add the following attributes: Name, Description, Price, Category, Brand, Rating, Stock.`,
+    );
+    return ResultAsync.fromPromise(
+      Promise.reject(
+        errorResult.match(
+          () => {
+            throw new Error("Unexpected success");
+          },
+          (e) => e,
+        ),
+      ),
+      (e) => e as ProblemDetails,
+    );
+  }
+
+  const mappings = [];
+
+  for (const [dummyJsonField, assetAttributeName] of Object.entries(
+    FIELD_TO_ATTRIBUTE_MAP,
+  )) {
+    const attribute = attributes.find(
+      (attr) => attr.name === assetAttributeName,
+    );
+
+    if (!attribute) {
+      logStructured(
+        "error",
+        "buildAttributesMappings",
+        "Required attribute not found",
+        {
+          attributeName: assetAttributeName,
+          objectTypeName: objectType.name,
+        },
+      );
+      const errorResult = StandardError.getOrDefault(416).error(
+        `Required attribute '${assetAttributeName}' not found in object type. ` +
+          `Please add this attribute with the exact name '${assetAttributeName}' (case-sensitive). ` +
+          `Required attributes: Name, Description, Price, Category, Brand, Rating, Stock.`,
+      );
+      return ResultAsync.fromPromise(
+        Promise.reject(
+          errorResult.match(
+            () => {
+              throw new Error("Unexpected success");
+            },
+            (e) => e,
+          ),
+        ),
+        (e) => e as ProblemDetails,
+      );
+    }
+
+    // Use the external ID that Assets has already assigned
+    if (!attribute.externalId) {
+      logStructured(
+        "error",
+        "buildAttributesMappings",
+        "Attribute missing externalId",
+        {
+          attributeName: assetAttributeName,
+          objectTypeName: objectType.name,
+        },
+      );
+      const errorResult = StandardError.getOrDefault(416).error(
+        `Attribute '${assetAttributeName}' has no externalId. This should not happen - Assets should assign external IDs automatically.`,
+      );
+      return ResultAsync.fromPromise(
+        Promise.reject(
+          errorResult.match(
+            () => {
+              throw new Error("Unexpected success");
+            },
+            (e) => e,
+          ),
+        ),
+        (e) => e as ProblemDetails,
+      );
+    }
+
+    mappings.push({
+      attributeExternalId: attribute.externalId,
+      attributeName: assetAttributeName,
+      attributeLocators: [dummyJsonField],
+      externalIdPart: assetAttributeName === "Key", // Use URL (stored in Key) as unique identifier
+    });
+  }
+
+  logStructured("info", "buildAttributesMappings", "Built attribute mappings", {
+    count: mappings.length,
+  });
+  return okAsync(mappings);
+}
+
+/**
+ * Main resolver function for building mapping
+ */
+export async function buildMappingBackend(
+  req: BuildMappingRequest,
+): Promise<{ success: boolean; data?: unknown; error?: ProblemDetails }> {
+  const { workspaceId, importId } = req.payload;
+
+  if (!workspaceId || !importId) {
+    logStructured(
+      "error",
+      "buildMappingBackend",
+      "Missing required parameters",
+      {
+        hasWorkspaceId: !!workspaceId,
+        hasImportId: !!importId,
+      },
+    );
+    const errorResult = StandardError.getOrDefault(400).error(
+      "Missing required parameters: workspaceId and importId",
+    );
+    return {
+      success: false,
+      error: errorResult.match(
+        () => {
+          throw new Error("Unexpected success");
+        },
+        (e) => e,
+      ),
+    };
+  }
+
+  try {
+    const result = await fetchSchemaAndMapping(workspaceId, importId)
+      .andThen((schemaAndMapping) => {
+        // Find the Product object type in the schema
+        const objectTypes =
+          schemaAndMapping.schema?.objectSchema?.objectTypes || [];
+        const productObjectType = objectTypes.find(
+          (ot) => ot.name === "Product",
+        );
+
+        if (!productObjectType) {
+          const availableTypes =
+            objectTypes.map((ot) => ot.name).join(", ") || "none";
+          logStructured(
+            "error",
+            "buildMappingBackend",
+            "Product object type not found",
+            {
+              workspaceId,
+              importId,
+              availableTypes,
+            },
+          );
+
+          const errorResult = StandardError.getOrDefault(404).error(
+            `Object type "Product" not found in schema. Available object types: ${availableTypes}. Please ensure the schema contains an object type named "Product" (case-sensitive).`,
+          );
+          return ResultAsync.fromPromise(
+            Promise.reject(
+              errorResult.match(
+                () => {
+                  throw new Error("Unexpected success");
+                },
+                (e) => e,
+              ),
+            ),
+            (e) => e as ProblemDetails,
+          );
+        }
+
+        logStructured(
+          "info",
+          "buildMappingBackend",
+          "Found Product object type",
+          {
+            workspaceId,
+            importId,
+            objectTypeExternalId: productObjectType.externalId,
+            attributeCount: productObjectType.attributes?.length || 0,
+          },
+        );
+
+        // Log all attributes returned from Assets
+        if (
+          productObjectType.attributes &&
+          productObjectType.attributes.length > 0
+        ) {
+          logStructured(
+            "debug",
+            "buildMappingBackend",
+            "Product attributes from Assets",
+            {
+              workspaceId,
+              importId,
+              attributes: productObjectType.attributes.map((attr) => ({
+                name: attr.name,
+                externalId: attr.externalId,
+              })),
+            },
+          );
+        } else {
+          logStructured(
+            "warn",
+            "buildMappingBackend",
+            "Product object type has no attributes",
+            {
+              workspaceId,
+              importId,
+            },
+          );
+        }
+
+        return okAsync({ schemaAndMapping, productObjectType });
+      })
+      .andThen(({ schemaAndMapping, productObjectType }) => {
+        return buildAttributesMappings(productObjectType).map(
+          (attributesMapping) => ({
+            schemaAndMapping,
+            productObjectType,
+            attributesMapping,
+          }),
+        );
+      })
+      .map(({ schemaAndMapping, productObjectType, attributesMapping }) => {
+        // NOTE: Schema version mismatch:
+        // - OpenAPI spec (docs/assets/openapi.json) references schema version: 2021_09_15
+        // - Production API validates against schema version: 2023_10_19
+        // The newer schema version has stricter validation requiring:
+        // 1. "schema" property at root level (not optional)
+        // 2. "description" field in each objectTypeMapping (required)
+        // This code includes both to satisfy the production API validation.
+        //
+        // IMPORTANT: We use the externalId values that Assets has already assigned
+        // to the Product object type and its attributes. These were fetched from
+        // the schema-and-mapping endpoint.
+        // See docs/assets/external-identifiers.md for details.
+
+        // Build schema from the fetched schemaAndMapping, but remove empty iconSchema
+        // The iconSchema validation requires at least 1 icon, so we omit it if empty
+        const schema = schemaAndMapping.schema
+          ? JSON.parse(JSON.stringify(schemaAndMapping.schema))
+          : {
+              objectSchema: {
+                name: "Products",
+                description: "Product schema for DummyJSON imports",
+                objectTypes: [],
+              },
+            };
+
+        // Remove iconSchema if it exists and has no icons
+        if (schema && typeof schema === "object" && "iconSchema" in schema) {
+          const iconSchema = schema.iconSchema as
+            | { icons?: unknown[] }
+            | undefined;
+          if (!iconSchema?.icons || iconSchema.icons.length === 0) {
+            delete schema.iconSchema;
+          }
+        }
+
+        const mapping = {
+          schema,
+          mapping: {
+            objectTypeMappings: [
+              {
+                objectTypeExternalId: productObjectType.externalId || "",
+                objectTypeName: productObjectType.name,
+                selector: "products",
+                description: "Mapping for Product objects from DummyJSON API",
+                attributesMapping,
+              },
+            ],
+          },
+        };
+
+        logStructured(
+          "debug",
+          "buildMappingBackend",
+          "Complete mapping configuration",
+          {
+            workspaceId,
+            importId,
+            mapping,
+          },
+        );
+
+        // Log summary of what we're mapping
+        const firstMapping = mapping.mapping.objectTypeMappings[0];
+        if (firstMapping) {
+          const externalIdParts = firstMapping.attributesMapping.filter(
+            (am) => am.externalIdPart,
+          );
+
+          logStructured("info", "buildMappingBackend", "Mapping summary", {
+            workspaceId,
+            importId,
+            selector: firstMapping.selector,
+            externalIdPartCount: externalIdParts.length,
+          });
+
+          // Validate that we have exactly one externalIdPart
+          if (externalIdParts.length === 0) {
+            logStructured(
+              "warn",
+              "buildMappingBackend",
+              "No externalIdPart defined",
+              {
+                workspaceId,
+                importId,
+              },
+            );
+          } else if (externalIdParts.length > 1) {
+            logStructured(
+              "warn",
+              "buildMappingBackend",
+              "Multiple externalIdParts defined",
+              {
+                workspaceId,
+                importId,
+                externalIdPartCount: externalIdParts.length,
+              },
+            );
+          } else {
+            const firstExternalIdPart = externalIdParts[0];
+            if (firstExternalIdPart) {
+              logStructured(
+                "info",
+                "buildMappingBackend",
+                "External ID part configured",
+                {
+                  workspaceId,
+                  importId,
+                  externalIdPartAttribute: firstExternalIdPart.attributeName,
+                },
+              );
+            }
+          }
+        }
+        return mapping;
+      });
+
+    if (result.isErr()) {
+      logStructured("error", "buildMappingBackend", "Error building mapping", {
+        workspaceId,
+        importId,
+        errorDetails: result.error,
+      });
+      const error = result.error as ProblemDetails;
+      return {
+        success: false,
+        error,
+      };
+    }
+
+    return {
+      success: true,
+      data: result.value,
+    };
+  } catch (error) {
+    logStructured(
+      "error",
+      "buildMappingBackend",
+      "Unexpected error in buildMapping",
+      {
+        workspaceId,
+        importId,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      },
+    );
+    const errorResult = StandardError.getOrDefault(500).error(
+      `Unexpected error: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return {
+      success: false,
+      error: errorResult.match(
+        () => {
+          throw new Error("Unexpected success");
+        },
+        (e) => e,
+      ),
+    };
+  }
+}
+
+/**
+ * Submit mapping configuration to Assets Import API
+ *
+ * This resolver handles the submission of the mapping to the Assets API
+ * with proper logging for observability.
+ */
+export async function submitMappingBackend(
+  req: SubmitMappingRequest,
+): Promise<{ success: boolean; error?: ProblemDetails }> {
+  const { workspaceId, importId, mapping } = req.payload;
+
+  if (!workspaceId || !importId || !mapping) {
+    logStructured(
+      "error",
+      "submitMappingBackend",
+      "Missing required parameters",
+      {
+        hasWorkspaceId: !!workspaceId,
+        hasImportId: !!importId,
+        hasMapping: !!mapping,
+      },
+    );
+    const errorResult = StandardError.getOrDefault(400).error(
+      "Missing required parameters: workspaceId, importId, and mapping",
+    );
+    return {
+      success: false,
+      error: errorResult.match(
+        () => {
+          throw new Error("Unexpected success");
+        },
+        (e) => e,
+      ),
+    };
+  }
+
+  const endpoint = route`/jsm/assets/workspace/${workspaceId}/v1/importsource/${importId}/mapping`;
+
+  logStructured(
+    "info",
+    "submitMappingBackend",
+    "Submitting mapping to Assets",
+    {
+      workspaceId,
+      importId,
+      api: {
+        method: "PUT",
+        path: `/jsm/assets/workspace/${workspaceId}/v1/importsource/${importId}/mapping`,
+      },
+    },
+  );
+
+  const objectTypeMappings = mapping.mapping.objectTypeMappings;
+
+  logStructured("debug", "submitMappingBackend", "Mapping payload prepared", {
+    workspaceId,
+    importId,
+    objectTypeMappingCount: objectTypeMappings.length,
+  });
+
+  try {
+    const result = await ResultAsync.fromPromise(
+      api.asApp().requestJira(endpoint, {
+        method: "PUT",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(mapping),
+      }),
+      (error: unknown): ProblemDetails =>
+        extractOrCreateProblemDetails(error, "submitting mapping"),
+    )
+      .andThen((response) => {
+        logStructured(
+          "info",
+          "submitMappingBackend",
+          "Response received from Assets",
+          {
+            workspaceId,
+            importId,
+            statusCode: response.status,
+            statusText: response.statusText,
+          },
+        );
+
+        return ResultAsync.fromPromise(
+          (async () => {
+            if (!response.ok) {
+              // For error responses, parse JSON to get detailed validation errors
+              try {
+                const errorData = await response.json();
+                logStructured(
+                  "error",
+                  "submitMappingBackend",
+                  "Assets API validation error",
+                  {
+                    workspaceId,
+                    importId,
+                    statusCode: response.status,
+                    errorDetails: errorData,
+                  },
+                );
+
+                return StandardError.getOrDefault(response.status).error(
+                  `Failed to submit mapping: ${response.status} ${response.statusText} - ${JSON.stringify(errorData)}`,
+                );
+              } catch (_parseError) {
+                // If JSON parse fails, fall back to text
+                const errorText = await response.text();
+                logStructured(
+                  "error",
+                  "submitMappingBackend",
+                  "Assets API error (non-JSON response)",
+                  {
+                    workspaceId,
+                    importId,
+                    statusCode: response.status,
+                    errorText,
+                  },
+                );
+
+                return StandardError.getOrDefault(response.status).error(
+                  `Failed to submit mapping: ${response.status} ${response.statusText} - ${errorText}`,
+                );
+              }
+            }
+
+            // Log successful response
+            try {
+              const responseBody = await response.json();
+              logStructured(
+                "debug",
+                "submitMappingBackend",
+                "Response body from Assets",
+                {
+                  workspaceId,
+                  importId,
+                  responseBody,
+                },
+              );
+            } catch (_parseError) {
+              const responseText = await response.text();
+              logStructured(
+                "debug",
+                "submitMappingBackend",
+                "Response body from Assets",
+                {
+                  workspaceId,
+                  importId,
+                  responseText,
+                },
+              );
+            }
+
+            return ok(response);
+          })(),
+          (error: unknown): ProblemDetails =>
+            extractOrCreateProblemDetails(error, "parsing mapping response"),
+        ).andThen((result) => result);
+      })
+      .map((_response) => {
+        logStructured(
+          "info",
+          "submitMappingBackend",
+          "Mapping submitted successfully",
+          {
+            workspaceId,
+            importId,
+          },
+        );
+        return true;
+      });
+
+    if (result.isErr()) {
+      logStructured(
+        "error",
+        "submitMappingBackend",
+        "Final error submitting mapping",
+        {
+          workspaceId,
+          importId,
+          errorDetails: result.error,
+        },
+      );
+      return {
+        success: false,
+        error: result.error,
+      };
+    }
+
+    return {
+      success: true,
+    };
+  } catch (error) {
+    logStructured(
+      "error",
+      "submitMappingBackend",
+      "Unexpected error in submitMapping",
+      {
+        workspaceId,
+        importId,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      },
+    );
+    const errorResult = StandardError.getOrDefault(500).error(
+      `Unexpected error: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return {
+      success: false,
+      error: errorResult.match(
+        () => {
+          throw new Error("Unexpected success");
+        },
+        (e) => e,
+      ),
+    };
+  }
+}

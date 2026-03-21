@@ -1,0 +1,20 @@
+{
+  "contextToken": "eyJ...lPA",
+  "importId": "176494de-845d-449e-83ae-532c6ed97524",
+  "workspaceId": "514fd9bb-dedc-4512-b251-d72f56a09dc5",
+  "schemaId": "75",
+  "context": {
+    "accountId": "557057:3d0e64ae-35d3-490d-b6d9-d81c981476d0",
+    "cloudId": "639c4c97-0caf-459b-bc27-da6250725163",
+    "localId": "ari:cloud:ecosystem::extension/da8dba10-6a9f-4cf3-b485-7b6f8fa580f3/1b9ce009-3e54-46b6-92da-467d46e691c3/static/explore-forge-assets-import",
+    "moduleKey": "explore-forge-assets-import",
+    "extension": {
+      "importId": "176494de-845d-449e-83ae-532c6ed97524",
+      "workspaceId": "514fd9bb-dedc-4512-b251-d72f56a09dc5",
+      "schemaId": "75",
+      "executionId": "exec-abc-123",
+      "type": "jiraServiceManagement:assetsImportType"
+    },
+    "userAccess": { "enabled": false, "hasAccess": true }
+  }
+}

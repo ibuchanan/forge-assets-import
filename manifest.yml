@@ -1,0 +1,62 @@
+app:
+  id: ari:cloud:ecosystem::app/da8dba10-6a9f-4cf3-b485-7b6f8fa580f3
+  runtime:
+    architecture: arm64
+    memoryMB: 256
+    name: nodejs24.x
+modules:
+  consumer:
+    - key: worker-consumer
+      queue: import-worker-queue
+      function: importQueueWorker
+    - key: controller-consumer
+      queue: import-controller-queue
+      function: importQueueController
+  jiraServiceManagement:assetsImportType:
+    - key: explore-forge-assets-import
+      title: Explore Forge Assets Import
+      description: Exploring the Forge capabilities for Assets import
+      icon: https://developer.atlassian.com/platform/forge/images/icons/issue-panel-icon.svg
+      render: native
+      resource: import-config-ui
+      resolver:
+        function: importConfigResolver
+      importStatus:
+        function: importLifecycleStatus
+      onDeleteImport:
+        function: importLifecycleDelete
+      startImport:
+        function: importLifecycleStart
+      stopImport:
+        function: importLifecycleStop
+  function:
+    - key: importConfigResolver
+      handler: index.importConfigResolver
+    - key: importLifecycleDelete
+      handler: index.onDeleteImport
+    - key: importLifecycleStart
+      handler: index.startImport
+    - key: importLifecycleStop
+      handler: index.stopImport
+    - key: importLifecycleStatus
+      handler: index.importStatus
+    - key: importQueueWorker
+      handler: index.importQueueWorker
+    - key: importQueueController
+      handler: index.importQueueController
+permissions:
+  scopes:
+    - storage:app
+    - import:import-configuration:cmdb
+    - read:cmdb-object:jira
+    - write:cmdb-object:jira
+    - read:cmdb-schema:jira
+    - read:cmdb-type:jira
+    - read:cmdb-attribute:jira
+  external:
+    fetch:
+      backend:
+        - address: https://dummyjson.com
+resources:
+  - key: import-config-ui
+    path: src/frontend/index.tsx
