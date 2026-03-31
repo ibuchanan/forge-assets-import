@@ -1,8 +1,7 @@
 // Export with semantic naming convention for manifest
 export {
   buildMapping,
-  importConfig,
-  importConfig as importConfigResolver,
+  importConfigResolver,
   importStatus,
   onDeleteImport,
   startImport,

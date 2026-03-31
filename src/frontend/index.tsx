@@ -133,6 +133,12 @@ export const App = () => {
   // Define the field mappings for display
   const fieldMappings = [
     {
+      dummyJson: "id",
+      assets: "Key",
+      type: "Integer",
+      description: "Unique product identifier (used as external ID)",
+    },
+    {
       dummyJson: "title",
       assets: "Name",
       type: "Text",

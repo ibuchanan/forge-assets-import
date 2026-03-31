@@ -270,7 +270,7 @@ function buildAttributesMappings(objectType: {
       attributeExternalId: attribute.externalId,
       attributeName: assetAttributeName,
       attributeLocators: [dummyJsonField],
-      externalIdPart: assetAttributeName === "Key", // Use URL (stored in Key) as unique identifier
+      externalIdPart: assetAttributeName === "Key", // Use product ID as the unique external identifier
     });
   }
 

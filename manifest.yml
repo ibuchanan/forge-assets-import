@@ -1,5 +1,4 @@
 app:
-  id: ari:cloud:ecosystem::app/da8dba10-6a9f-4cf3-b485-7b6f8fa580f3
   runtime:
     architecture: arm64
     memoryMB: 256

@@ -1,12 +1,47 @@
-# Forge Hello World
+# Forge Assets Import
 
-This project contains a Forge app written in Javascript that displays "Hello, World!" and ImportId in the "Configure App" modal for 3rd Party Import Structures. 
-It also outlines how to make use of Forge's Async Events API to import 3rd party data into Assets by setting up a controller and worker queue for data ingestion. 
+[![Apache 2.0 license](https://img.shields.io/badge/license-Apache%202.0-blue.svg?style=flat-square)](LICENSE)
 
-See [developer.atlassian.com/platform/forge/assets-import-app/](https://developer.atlassian.com/platform/forge/assets-import-app) for documentation and tutorial of this Forge Template, including the [documentation of Asset APIs](https://developer.atlassian.com/cloud/assets/). 
+[JSM Assets](https://support.atlassian.com/jira-service-management-cloud/docs/what-is-assets/)
+is Atlassian's configuration management database (CMDB) built into Jira Service Management.
+Teams use it to track infrastructure, services, hardware, and any other objects that matter to their operations.
+A critical capability is **importing data from external systems** —
+so that Assets reflects the real state of your environment without manual entry.
 
-Also see [Forge Async Events API Diagram](Https://dac-static.atlassian.com/platform/forge/images/assets-import-async-events-api-example.png?_v=1.5800.340) for a visual representation of the Async Events API.
-With the Controller Queue a reference to `controller-resolver.js` and Worker Queue in `worker-resolver.js`
+The [Forge Assets Import API](https://developer.atlassian.com/platform/forge/assets-import-app/)
+lets you build a first-class import integration
+that appears natively inside the Assets UI,
+complete with configuration, field mapping, progress tracking, and lifecycle controls.
+
+This app demonstrates the full import integration pattern:
+
+* A **configuration UI** rendered inside the Assets "Configure App" modal,
+  showing the field mapping between the external source and Assets attributes.
+* **Import lifecycle hooks** (`startImport`, `stopImport`, `importStatus`, `onDeleteImport`)
+  wired to Forge functions via the `jiraServiceManagement:assetsImportType` module.
+* A **controller queue** that creates an import execution via the Assets API,
+  fetches the first data batch to determine the total record count,
+  and pushes the initial work item to the worker queue.
+* A **worker queue** that fetches data in batches from the external source,
+  submits each batch to the Assets import execution endpoint,
+  reports progress, and self-chains until all records are ingested.
+
+[DummyJSON](https://dummyjson.com/docs/products) is used as a stand-in external data source
+(a public fake store API that returns product records).
+Replace it with your own external system client in `src/external/`.
+
+See the
+[Forge Async Events API diagram](https://dac-static.atlassian.com/platform/forge/images/assets-import-async-events-api-example.png?_v=1.5800.340)
+for a visual overview of the controller/worker queue pattern.
+
+- **Atlassian Forge**. If this is your first Forge app,
+  [try a simple "hello world" app first](https://go.atlassian.com/forge).
+- **JSM Assets**. Learn more about
+  [Assets object types and schemas](https://developer.atlassian.com/cloud/assets/).
+
+Questions?
+Join the Forge conversation in
+[the Atlassian developer community](https://community.developer.atlassian.com/c/forge/).
 
 ## Requirements
 
@@ -14,27 +49,51 @@ See [Set up Forge](https://developer.atlassian.com/platform/forge/set-up-forge/)
 
 ## Quick start
 
-- Modify your app frontend by editing the `src/frontend/index.jsx` file.
-
-- Modify your app backend by editing the `src/resolvers/index.js` file to define resolver functions. See [Forge resolvers](https://developer.atlassian.com/platform/forge/runtime-reference/custom-ui-resolver/) for documentation on resolver functions.
-
-- Build and deploy your app by running:
+Register the app (once per developer, writes your app ID into `manifest.yml`):
 ```
+forge register
+```
+
+Install dependencies:
+```
+npm install
+```
+
+Validate, then deploy your app:
+```
+npm run format
+npm run lint
+npm run test
 forge deploy
 ```
 
-- Install your app in an Atlassian site by running:
+Install your app on an Atlassian site:
 ```
 forge install
 ```
 
-- Develop your app by running `forge tunnel` to proxy invocations locally:
+Develop your app locally using `forge tunnel` to proxy invocations:
 ```
 forge tunnel
 ```
 
 ### Notes
-- Use the `forge deploy` command when you want to persist code changes.
-- Use the `forge install` command when you want to install the app on a new site.
-- Once the app is installed on a site, the site picks up the new app changes you deploy without needing to rerun the install command.
+- Use `forge deploy` when you want to persist code changes.
+- Use `forge install` when you want to install the app on a new site.
+  Once installed, subsequent deploys are picked up automatically without reinstalling —
+  unless you add new scopes or egress rules, in which case run `forge install --upgrade`.
+- The external data source (DummyJSON) is declared in `manifest.yml` under `permissions.external.fetch`.
+  Update this entry when pointing the app at a different external system.
+
+## Contributions
+
+Contributions to the Forge Assets Import repo are welcome!
+Please see [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+
+## License
+
+Copyright (c) 2025 Atlassian US., Inc.
+Apache 2.0 licensed, see [LICENSE](LICENSE) file.
+
+[![With ❤️ from Atlassian](https://raw.githubusercontent.com/atlassian-internal/oss-assets/master/banner-with-thanks-light.png)](https://www.atlassian.com)
 

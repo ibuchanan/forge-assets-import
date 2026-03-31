@@ -7,14 +7,8 @@ import api, { route } from "@forge/api";
 import { kvs } from "@forge/kvs";
 import type { AssetsImportContext, ImportResult } from "../assets/types";
 import { logContext, logStructured } from "../forge/logging";
+import { getJobIdStorageKey } from "../forge/storage";
 import { controllerQueue } from "../resolvers/controller-resolver";
-
-/**
- * Storage key for tracking the active job ID for an import
- */
-function getJobIdStorageKey(importId: string): string {
-  return `import:${importId}:jobId`;
-}
 
 /**
  * Cancel an active import execution via the Assets API.
