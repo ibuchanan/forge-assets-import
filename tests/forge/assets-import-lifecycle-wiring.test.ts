@@ -19,11 +19,7 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { findExportedNames, parseSourceFile } from "./ast-helpers";
-import {
-  getManifestHandlerReferences,
-  loadManifest,
-  ParsedManifest,
-} from "./manifest-helpers";
+import { getManifestHandlerReferences, loadManifest } from "./manifest-helpers";
 
 interface AssetsImportTypeModuleWithLifecycle {
   key: string;
@@ -94,8 +90,9 @@ describe("Assets Import Lifecycle Hook Wiring", () => {
 
       // Check that the resolver is declared if present
       if (module.resolver?.function) {
+        const resolverFunction = module.resolver.function;
         const functionExists = (manifest.modules.function || []).some(
-          (f) => f.key === module.resolver!.function,
+          (f) => f.key === resolverFunction,
         );
 
         if (!functionExists) {
@@ -126,10 +123,6 @@ describe("Assets Import Lifecycle Hook Wiring", () => {
     }
 
     const violations: string[] = [];
-    const declaredFunctions = new Set(
-      (manifest.modules.function || []).map((f) => f.key),
-    );
-
     // Get all referenced function names from lifecycle hooks
     const referencedFunctionNames = new Set<string>();
 

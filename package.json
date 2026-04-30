@@ -1,39 +1,44 @@
 {
   "name": "explore-forge-assets-import",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "private": true,
   "license": "Apache-2.0",
   "main": "index.ts",
   "scripts": {
     "build": "tsc",
     "changelog": "git cliff",
-    "check": "npm run check & npm run types & npm run test & forge lint & wait",
+    "check": "npm run format:check && npm run typecheck && npm run lint && npm run test",
     "clean": "rm -rf ./dist",
-    "coverage": "vitest run --coverage",
     "format": "biome format --write",
-    "generate-types": "openapi-typescript docs/jsm-assets-docs/content/cloud/assets/swagger.json -o src/types/assets-api-generated.d.ts",
-    "lint": "biome lint && forge lint",
-    "test": "vitest",
+    "format:check": "biome format",
+    "generate:types": "openapi-typescript docs/jsm-assets-docs/content/cloud/assets/swagger.json -o src/types/assets-api-generated.d.ts",
+    "lint": "npm run lint:check",
+    "lint:check": "biome lint && forge lint",
+    "lint:fix": "biome lint --write",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest watch",
     "todo": "grep -rn 'TODO' --exclude='package.json' . --color=auto || echo 'No TODOs found!'",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@forge/bridge": "^5.14",
+    "@forge/api": "^7.1",
+    "@forge/bridge": "^5.16",
     "@forge/events": "^2.1",
-    "@forge/kvs": "^1.5",
-    "@forge/react": "^11.13",
-    "@forge/resolver": "^1.7",
+    "@forge/kvs": "^1.6",
+    "@forge/react": "^11.15",
+    "@forge/resolver": "^1.8",
     "neverthrow": "^8.2",
     "react": "^18.3"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4",
-    "@types/node": "^25.3",
+    "@types/node": "^25.6",
     "@vitest/coverage-v8": "^4.1",
     "archunit": "^2.1",
     "openapi-typescript": "^7.13",
-    "tsx": "^4.21",
     "typescript": "^5.9",
-    "vitest": "^4.0"
+    "vitest": "^4.1",
+    "yaml": "^2.8"
   }
 }

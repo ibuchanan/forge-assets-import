@@ -1,5 +1,5 @@
 import api, { assumeTrustedRoute } from "@forge/api";
-import type { AsyncEvent, PushResult } from "@forge/events";
+import type { AsyncEvent } from "@forge/events";
 import { Queue } from "@forge/events";
 import { fetchProductsBatch } from "../external/dummyjson-client";
 import { toRelativePath } from "../forge/api-path";
@@ -159,6 +159,7 @@ async function submitProgress(
         processed,
         total,
         statusCode: response.status,
+        error: errorText,
         api: { method: "PUT", path: "/progress" },
       });
       // Don't throw - progress reporting is optional/best-effort

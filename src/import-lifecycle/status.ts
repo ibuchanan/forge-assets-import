@@ -137,6 +137,7 @@ export async function getExecutionStatus(
           importsourceId: importId,
           workspaceId,
           statusCode: response.status,
+          error: errorText,
           api: {
             method: "GET",
             path: `/importsource/${importId}/executions/${executionId}`,
@@ -199,6 +200,7 @@ export async function getExecutionStatusByUrl(
         {
           statusCode: response.status,
           url: getExecutionStatusUrl,
+          error: errorText,
         },
       );
       return null;

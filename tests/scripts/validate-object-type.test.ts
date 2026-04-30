@@ -10,10 +10,8 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  ASSETS_TYPE_IDS,
   type ObjectTypeAttribute,
   REQUIRED_ATTRIBUTES,
-  type ValidationResult,
   validateAttributes,
 } from "../../src/scripts/validate-object-type-logic";
 

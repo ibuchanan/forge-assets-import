@@ -44,6 +44,7 @@ async function cancelExecution(
         workspaceId,
         executionId,
         statusCode: response.status,
+        error: errorText,
         api: {
           method: "DELETE",
           path: `/importsource/${importId}/executions/${executionId}/cancel`,

@@ -3,6 +3,7 @@ app:
     architecture: arm64
     memoryMB: 256
     name: nodejs24.x
+  id: ari:cloud:ecosystem::app/a63a1923-4dd3-4489-8013-6de8b273d2ac
 modules:
   consumer:
     - key: worker-consumer

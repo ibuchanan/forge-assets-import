@@ -45,7 +45,13 @@ Join the Forge conversation in
 
 ## Requirements
 
-See [Set up Forge](https://developer.atlassian.com/platform/forge/set-up-forge/) for instructions to get set up.
+See [Set up Forge](https://developer.atlassian.com/platform/forge/set-up-forge/) for full setup instructions.
+At minimum, you need:
+
+- Node.js and npm for installing dependencies and running local checks.
+- The Forge CLI, installed and authenticated with `forge login`.
+- Access to an Atlassian site with Jira Service Management and Assets.
+- Permission to install Forge apps on that site.
 
 ## Quick start
 
@@ -59,23 +65,28 @@ Install dependencies:
 npm install
 ```
 
-Validate, then deploy your app:
+Validate the app:
 ```
-npm run format
-npm run lint
-npm run test
+npm run check
+```
+
+Deploy your app using the interactive Forge command:
+```
 forge deploy
 ```
 
-Install your app on an Atlassian site:
+Install your app on an Atlassian site using the interactive Forge command:
 ```
 forge install
 ```
 
-Develop your app locally using `forge tunnel` to proxy invocations:
+After the app has been deployed and installed on a site,
+develop it locally using `forge tunnel` to proxy development-environment invocations to your local code:
 ```
 forge tunnel
 ```
+
+See `package.json` for additional development utilities.
 
 ### Notes
 - Use `forge deploy` when you want to persist code changes.
