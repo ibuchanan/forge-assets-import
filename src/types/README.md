@@ -24,7 +24,7 @@ const status = statusData.status; // TypeScript knows this exists!
 When the OpenAPI spec (`docs/assets/openapi.json`) is updated:
 
 ```bash
-npm run generate-types
+npm run generate:types
 ```
 
 This regenerates `assets-api-generated.d.ts` from the spec. The subset file (`assets-api.ts`) is manually maintained.

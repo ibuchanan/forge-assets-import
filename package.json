@@ -3,11 +3,11 @@
   "version": "1.1.0",
   "private": true,
   "license": "Apache-2.0",
-  "main": "index.ts",
+  "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
     "changelog": "git cliff",
-    "check": "npm run format:check && npm run typecheck && npm run lint && npm run test",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test",
     "clean": "rm -rf ./dist",
     "format": "biome format --write",
     "format:check": "biome format",
@@ -18,7 +18,7 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest watch",
-    "todo": "grep -rn 'TODO' --exclude='package.json' . --color=auto || echo 'No TODOs found!'",
+    "dev:todo": "grep -rn 'TODO' --exclude='package.json' . --color=auto || echo 'No TODOs found!'",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

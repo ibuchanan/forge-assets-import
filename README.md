@@ -34,6 +34,8 @@ See the
 [Forge Async Events API diagram](https://dac-static.atlassian.com/platform/forge/images/assets-import-async-events-api-example.png?_v=1.5800.340)
 for a visual overview of the controller/worker queue pattern.
 
+## Learn more
+
 - **Atlassian Forge**. If this is your first Forge app,
   [try a simple "hello world" app first](https://go.atlassian.com/forge).
 - **JSM Assets**. Learn more about
@@ -65,7 +67,7 @@ Install dependencies:
 npm install
 ```
 
-Validate the app:
+Validate the app (formats, type-checks, lints, and tests):
 ```
 npm run check
 ```
@@ -86,7 +88,9 @@ develop it locally using `forge tunnel` to proxy development-environment invocat
 forge tunnel
 ```
 
-See `package.json` for additional development utilities.
+Additional scripts in `package.json`:
+- `npm run dev:todo` — lists all TODO comments in the source tree.
+- `npm run changelog` — generates a changelog from git history using [git-cliff](https://git-cliff.org/).
 
 ### Notes
 - Use `forge deploy` when you want to persist code changes.
@@ -95,6 +99,7 @@ See `package.json` for additional development utilities.
   unless you add new scopes or egress rules, in which case run `forge install --upgrade`.
 - The external data source (DummyJSON) is declared in `manifest.yml` under `permissions.external.fetch`.
   Update this entry when pointing the app at a different external system.
+- Assets API TypeScript types live in `src/types/`. See [`src/types/README.md`](src/types/README.md) for details on type generation and maintenance.
 
 ## Contributions
 
@@ -103,7 +108,7 @@ Please see [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 ## License
 
-Copyright (c) 2025 Atlassian US., Inc.
+Copyright (c) 2025–2026 Atlassian US., Inc.
 Apache 2.0 licensed, see [LICENSE](LICENSE) file.
 
 [![With ❤️ from Atlassian](https://raw.githubusercontent.com/atlassian-internal/oss-assets/master/banner-with-thanks-light.png)](https://www.atlassian.com)
