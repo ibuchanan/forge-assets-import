@@ -36,9 +36,9 @@ for a visual overview of the controller/worker queue pattern.
 
 ## Learn more
 
-- **Atlassian Forge**. If this is your first Forge app,
+* **Atlassian Forge**. If this is your first Forge app,
   [try a simple "hello world" app first](https://go.atlassian.com/forge).
-- **JSM Assets**. Learn more about
+* **JSM Assets**. Learn more about
   [Assets object types and schemas](https://developer.atlassian.com/cloud/assets/).
 
 Questions?
@@ -50,56 +50,80 @@ Join the Forge conversation in
 See [Set up Forge](https://developer.atlassian.com/platform/forge/set-up-forge/) for full setup instructions.
 At minimum, you need:
 
-- Node.js and npm for installing dependencies and running local checks.
-- The Forge CLI, installed and authenticated with `forge login`.
-- Access to an Atlassian site with Jira Service Management and Assets.
-- Permission to install Forge apps on that site.
+* Node.js and npm for installing dependencies and running local checks.
+* The Forge CLI, installed and authenticated with `forge login`.
+* Access to an Atlassian site with Jira Service Management and Assets.
+* Permission to install Forge apps on that site.
 
 ## Quick start
 
-Register the app (once per developer, writes your app ID into `manifest.yml`):
-```
+Fork, and clone this repo and take ownership:
+
+```bash
+# clone the project
+git clone https://github.com/${REPO}/forge-assets-import.git
+cd forge-assets-import
+
+# allow package-lock.json to be committed
+sed -i '/package-lock\.json/d' .gitignore
+
+# register the app (writes your app ID into `manifest.yml`):
 forge register
 ```
 
-Install dependencies:
+Now manually edit [`manifest.yml`](./manifest.yml) to customize `modules.jiraServiceManagement:assetsImportType.[key|title|description]`, then:
+
+```bash
+# commit and push your customizations
+git commit -am "taking ownership of skeleton project"
+git push
 ```
+
+Install dependencies:
+
+```bash
 npm install
 ```
 
 Validate the app (formats, type-checks, lints, and tests):
-```
+
+```bash
 npm run check
 ```
 
 Deploy your app using the interactive Forge command:
-```
+
+```bash
 forge deploy
 ```
 
 Install your app on an Atlassian site using the interactive Forge command:
-```
+
+```bash
 forge install
 ```
 
 After the app has been deployed and installed on a site,
 develop it locally using `forge tunnel` to proxy development-environment invocations to your local code:
-```
+
+```bash
 forge tunnel
 ```
 
 Additional scripts in `package.json`:
-- `npm run dev:todo` — lists all TODO comments in the source tree.
-- `npm run changelog` — generates a changelog from git history using [git-cliff](https://git-cliff.org/).
+
+* `npm run dev:todo` — lists all TODO comments in the source tree.
+* `npm run changelog` — generates a changelog from git history using [git-cliff](https://git-cliff.org/).
 
 ### Notes
-- Use `forge deploy` when you want to persist code changes.
-- Use `forge install` when you want to install the app on a new site.
+
+* Use `forge deploy` when you want to persist code changes.
+* Use `forge install` when you want to install the app on a new site.
   Once installed, subsequent deploys are picked up automatically without reinstalling —
-  unless you add new scopes or egress rules, in which case run `forge install --upgrade`.
-- The external data source (DummyJSON) is declared in `manifest.yml` under `permissions.external.fetch`.
+  unless you add new scopes or egress rules, in which case run `forge install **upgrade`.
+* The external data source (DummyJSON) is declared in `manifest.yml` under `permissions.external.fetch`.
   Update this entry when pointing the app at a different external system.
-- Assets API TypeScript types live in `src/types/`. See [`src/types/README.md`](src/types/README.md) for details on type generation and maintenance.
+* Assets API TypeScript types live in `src/types/`. See [`src/types/README.md`](src/types/README.md) for details on type generation and maintenance.
 
 ## Contributions
 
@@ -112,4 +136,3 @@ Copyright (c) 2025–2026 Atlassian US., Inc.
 Apache 2.0 licensed, see [LICENSE](LICENSE) file.
 
 [![With ❤️ from Atlassian](https://raw.githubusercontent.com/atlassian-internal/oss-assets/master/banner-with-thanks-light.png)](https://www.atlassian.com)
-
