@@ -19,6 +19,13 @@ interface AssetsImportExtension {
   schemaId: string;
 }
 
+function extractInvokeBody<T>(response: T | { body: T }): T {
+  if (response !== null && typeof response === "object" && "body" in response) {
+    return (response as { body: T }).body;
+  }
+  return response as T;
+}
+
 export const submitAssetMapping = async (
   extension: AssetsImportExtension,
   mapping: {
@@ -39,14 +46,16 @@ export const submitAssetMapping = async (
 ): Promise<void> => {
   const { workspaceId, importId } = extension;
 
-  const result = await invoke<{
-    success: boolean;
-    error?: { detail?: string };
-  }>("submitMapping", {
-    workspaceId,
-    importId,
-    mapping,
-  });
+  const result = extractInvokeBody(
+    await invoke<{
+      success: boolean;
+      error?: { detail?: string };
+    }>("submitMapping", {
+      workspaceId,
+      importId,
+      mapping,
+    }),
+  );
 
   if (!result.success) {
     throw new Error(
@@ -76,14 +85,16 @@ export const App = () => {
     try {
       // Build the mapping by calling backend resolver
       // This allows proper logging and debugging of Assets API responses
-      const mappingResult = await invoke<{
-        success: boolean;
-        data?: unknown;
-        error?: { detail?: string };
-      }>("buildMapping", {
-        workspaceId: extension.workspaceId,
-        importId: extension.importId,
-      });
+      const mappingResult = extractInvokeBody(
+        await invoke<{
+          success: boolean;
+          data?: unknown;
+          error?: { detail?: string };
+        }>("buildMapping", {
+          workspaceId: extension.workspaceId,
+          importId: extension.importId,
+        }),
+      );
 
       if (!mappingResult.success || !mappingResult.data) {
         // Handle error without throwing - show error flag directly
