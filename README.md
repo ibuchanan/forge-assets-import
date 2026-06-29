@@ -34,6 +34,16 @@ See the
 [Forge Async Events API diagram](https://dac-static.atlassian.com/platform/forge/images/assets-import-async-events-api-example.png?_v=1.5800.340)
 for a visual overview of the controller/worker queue pattern.
 
+## Mapping configuration and the Insight JSON selector
+
+The mapping configuration uses two Atlassian-proprietary query concepts — not standard JSONPath or JMESPath.
+
+**`selector`** on each `objectTypeMapping` is a top-level key name that tells the Assets Import engine which field in your submitted data payload holds the array of records to process. This project submits `{ data: { products: [...] } }` and sets `selector: "products"`, so Assets iterates over `data.products`.
+
+**`attributeLocators`** on each `attributeMapping` is an array of field name strings that extract a value from each individual record. This project uses flat keys (`"id"`, `"title"`, `"price"`, etc.). Whether the Insight JSON selector supports deeper path syntax (e.g. dot-notation for nested fields) is not documented by Atlassian; treat it as a flat key lookup until proven otherwise.
+
+See `tests/data/schema/assets_mapping_2023_10_19.schema.json` for the formal schema and `tests/data/payload/mapping-configuration.json` for a concrete example.
+
 ## Learn more
 
 - **Atlassian Forge**. If this is your first Forge app,
