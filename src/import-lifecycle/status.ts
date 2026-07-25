@@ -82,7 +82,7 @@ async function fetchConfigurationStatus(
     // Extract status from response
     const statusData = (await statusResponse.json()) as Record<string, unknown>;
     // Note: API returns "status" field, not "configurationStatus"
-    const configurationStatus = statusData.status as string | undefined;
+    const configurationStatus = statusData["status"] as string | undefined;
 
     return ok(configurationStatus);
   } catch (error) {

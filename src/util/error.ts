@@ -22,7 +22,7 @@ export function extractOrCreateProblemDetails(
     error &&
     typeof error === "object" &&
     "_unsafeUnwrapErr" in error &&
-    typeof (error as Record<string, unknown>)._unsafeUnwrapErr === "function"
+    typeof (error as Record<string, unknown>)["_unsafeUnwrapErr"] === "function"
   ) {
     // Extract the ProblemDetails from the Result
     return (
@@ -117,7 +117,7 @@ export interface ProblemDetails {
   status: number; // HTTP status code (e.g., 404)
   detail: string; // Human-readable explanation specific to this occurrence
   timestamp: string; // ISO 8601 timestamp
-  instance?: string; // Optional URI reference identifying this specific occurrence
+  instance?: string | undefined; // Optional URI reference identifying this specific occurrence
 }
 
 /**

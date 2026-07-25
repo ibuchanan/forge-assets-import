@@ -19,7 +19,7 @@ export interface ValidationResult {
   attribute: string;
   expectedType: string;
   found: boolean;
-  actualType?: string;
+  actualType?: string | undefined;
   caseMismatch?: boolean;
   typeMismatch?: boolean;
 }

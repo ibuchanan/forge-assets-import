@@ -12,12 +12,14 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
-    "noImplicitOverride": true
+    "noImplicitOverride": true,
 
-    /* Deliberately not enabled: exactOptionalPropertyTypes and
-       noPropertyAccessFromIndexSignature currently fail against existing
-       source (src/import-lifecycle/status.ts, src/util/error.ts,
-       src/scripts/validate-object-type-logic.ts). Enabling them requires a
-       runtime source refactor, which is out of scope for Iteration Zero. */
+    /* Already true via `extends` (tsconfig.json sets both), restated here
+       explicitly because Forge prelint checks this file's own compilerOptions
+       and doesn't follow `extends` — see require-tsconfig-typecheck-* rules. */
+    "noImplicitReturns": true,
+    "noUncheckedIndexedAccess": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "exactOptionalPropertyTypes": true
   }
 }
