@@ -307,6 +307,48 @@ export async function cancelExecution(
   }
 }
 
+export async function cancelExecutionByUrl(cancelUrl: string): Promise<void> {
+  try {
+    const response = await api
+      .asApp()
+      .requestJira(assumeTrustedRoute(toRelativePath(cancelUrl)), {
+        method: "DELETE",
+        headers: {
+          Accept: "application/json",
+        },
+      });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      logStructured(
+        "warn",
+        "cancelExecutionByUrl",
+        "Failed to cancel execution",
+        {
+          url: cancelUrl,
+          statusCode: response.status,
+          error: errorText,
+        },
+      );
+      return;
+    }
+
+    logStructured("info", "cancelExecutionByUrl", "Cancelled execution", {
+      url: cancelUrl,
+    });
+  } catch (error) {
+    logStructured(
+      "warn",
+      "cancelExecutionByUrl",
+      "Error cancelling execution",
+      {
+        url: cancelUrl,
+        error: error instanceof Error ? error.message : String(error),
+      },
+    );
+  }
+}
+
 export function getSchemaAndMapping(
   workspaceId: string,
   importId: string,

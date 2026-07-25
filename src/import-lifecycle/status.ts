@@ -16,6 +16,7 @@ import {
   type ImportStatusResult,
 } from "../assets/types";
 import { logStructured } from "../forge/logging";
+import { getActiveRunState, saveLatestOutcome } from "./run-state";
 
 export type { ExecutionStatus };
 export {
@@ -41,12 +42,67 @@ export function mapConfigurationStatus(
   }
 }
 
+/**
+ * Best-effort reconciliation: if the active run has reached a terminal
+ * state (DONE/CANCELLED) on the Assets side, promote it to the latest
+ * confirmed outcome. Failures here must never affect the returned status.
+ */
+async function reconcileTerminalOutcome(importId: string): Promise<void> {
+  try {
+    const activeRunState = await getActiveRunState(importId);
+    if (!activeRunState?.getExecutionStatusUrl) {
+      return;
+    }
+
+    const executionStatus = await getExecutionStatusByUrlFromClient(
+      activeRunState.getExecutionStatusUrl,
+    );
+
+    if (
+      executionStatus?.status !== "DONE" &&
+      executionStatus?.status !== "CANCELLED"
+    ) {
+      return;
+    }
+
+    const { progressResult } = executionStatus;
+    await saveLatestOutcome(importId, {
+      outcome:
+        executionStatus.status === "DONE"
+          ? "confirmed-done"
+          : "confirmed-cancelled",
+      recordedAt: new Date().toISOString(),
+      ...(progressResult && {
+        counts: {
+          entriesCreated: progressResult.entriesCreated,
+          entriesUpdated: progressResult.entriesUpdated,
+          entriesFailed: progressResult.entriesFailed,
+          entriesProcessed: progressResult.entriesProcessed,
+        },
+      }),
+    });
+  } catch (error) {
+    logStructured(
+      "debug",
+      "importStatus",
+      "Failed to reconcile terminal outcome",
+      {
+        importsourceId: importId,
+        error: error instanceof Error ? error.message : String(error),
+      },
+    );
+  }
+}
+
 export async function importStatus(
   context: AssetsImportContext,
 ): Promise<ImportStatusResult> {
   // logContext(context, "importStatus");
   const { importId, workspaceId } = context;
   const statusResult = await getConfigStatus(workspaceId, importId);
+
+  await reconcileTerminalOutcome(importId);
+
   if (statusResult.isErr()) {
     logStructured("debug", "importStatus", "Could not query status", {
       importsourceId: importId,

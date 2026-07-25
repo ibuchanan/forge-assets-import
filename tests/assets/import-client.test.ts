@@ -28,6 +28,7 @@ vi.mock("@forge/api", () => ({
 
 import {
   cancelExecution,
+  cancelExecutionByUrl,
   getConfigStatus,
   getExecutionStatus,
   getExecutionStatusByUrl,
@@ -294,6 +295,44 @@ describe("cancelExecution", () => {
 
     await expect(
       cancelExecution("workspace-1", "import-1", "exec-1"),
+    ).resolves.toBeUndefined();
+  });
+});
+
+describe("cancelExecutionByUrl", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("sends a DELETE to the normalized HATEOAS cancel URL", async () => {
+    requestJiraMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => "",
+    });
+
+    await cancelExecutionByUrl(
+      "https://api.atlassian.com/jsm/assets/workspace/ws/v1/importsource/import-1/executions/exec-1/cancel",
+    );
+
+    expect(requestJiraMock).toHaveBeenCalledWith(
+      "/jsm/assets/workspace/ws/v1/importsource/import-1/executions/exec-1/cancel",
+      expect.objectContaining({
+        method: "DELETE",
+        headers: { Accept: "application/json" },
+      }),
+    );
+  });
+
+  it("resolves without throwing when the cancel request fails", async () => {
+    requestJiraMock.mockResolvedValue({
+      ok: false,
+      status: 500,
+      text: async () => "server error",
+    });
+
+    await expect(
+      cancelExecutionByUrl("/executions/exec-1/cancel"),
     ).resolves.toBeUndefined();
   });
 });

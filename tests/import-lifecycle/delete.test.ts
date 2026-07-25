@@ -20,14 +20,37 @@
  * 4. Handles context correctly
  */
 
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AssetsImportContext } from "../../src/assets/types";
 import { onDeleteImport } from "../../src/import-lifecycle/delete";
 // Load test context data for integration testing
 import onDeleteContext from "../data/context/onDelete.json";
 import { buildContext, buildFullContext } from "../helpers/test-builders";
 
+vi.mock("../../src/import-lifecycle/run-state", () => ({
+  clearActiveRunState: vi.fn().mockResolvedValue(undefined),
+  clearLatestOutcome: vi.fn().mockResolvedValue(undefined),
+}));
+
 describe("onDeleteImport - Lifecycle Extension Point", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe("lifecycle state cleanup", () => {
+    it("clears active run state and latest outcome for the deleted import", async () => {
+      const { clearActiveRunState, clearLatestOutcome } = await import(
+        "../../src/import-lifecycle/run-state"
+      );
+      const context = buildContext({ importId: "import-to-delete" });
+
+      await onDeleteImport(context);
+
+      expect(clearActiveRunState).toHaveBeenCalledWith("import-to-delete");
+      expect(clearLatestOutcome).toHaveBeenCalledWith("import-to-delete");
+    });
+  });
+
   describe("context acceptance", () => {
     it("should handle import deletion successfully", async () => {
       const context = onDeleteContext as unknown as AssetsImportContext;

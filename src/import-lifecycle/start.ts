@@ -9,12 +9,11 @@
  */
 
 import type { PushResult } from "@forge/events";
-import { kvs } from "@forge/kvs";
 import { startExecution } from "../assets/import-client";
 import type { AssetsImportContext, ImportResult } from "../assets/types";
 import { logContext, logStructured } from "../forge/logging";
-import { getJobIdStorageKey } from "../forge/storage";
 import { controllerQueue } from "../resolvers/controller-resolver";
+import { saveActiveRunState } from "./run-state";
 
 export async function startImport(
   context: AssetsImportContext,
@@ -63,8 +62,16 @@ export async function startImport(
       body: eventBody,
     });
 
-    // Store the jobId so stopImport can cancel it if needed
-    await kvs.set(getJobIdStorageKey(importId), pushResult.jobId);
+    // Store the active run state so stopImport and importStatus can
+    // operate without depending on context.extension.executionId.
+    await saveActiveRunState(importId, {
+      executionId,
+      controllerJobId: pushResult.jobId,
+      cancelUrl,
+      getExecutionStatusUrl,
+      startedAt: new Date().toISOString(),
+      state: "running",
+    });
 
     logStructured("info", "startImport", "Import queued to controller", {
       importsourceId: importId,

@@ -75,6 +75,11 @@ vi.mock("../../src/resolvers/controller-resolver", () => ({
   },
 }));
 
+// Mock the run-state module so we can assert on what gets persisted
+vi.mock("../../src/import-lifecycle/run-state", () => ({
+  saveActiveRunState: vi.fn().mockResolvedValue(undefined),
+}));
+
 describe("startImport - Lifecycle Extension Point", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -448,6 +453,53 @@ describe("startImport - Lifecycle Extension Point", () => {
 
       expect(result).toEqual({ result: "start import" });
       expect(typeof result.result).toBe("string");
+    });
+  });
+
+  describe("active run state persistence", () => {
+    it("should persist active run state with Assets HATEOAS links after queuing", async () => {
+      const context: AssetsImportContext = {
+        contextToken: "test-token",
+        importId: "import-123",
+        workspaceId: "workspace-456",
+        schemaId: "schema-789",
+        context: {
+          accountId: "test-account",
+          cloudId: "test-cloud",
+          localId: "test-local",
+          moduleKey: "test-module",
+          extension: {
+            importId: "import-123",
+            workspaceId: "workspace-456",
+            schemaId: "schema-789",
+            executionId: "execution-abc",
+            type: "test-type",
+          },
+          userAccess: {
+            enabled: true,
+            hasAccess: true,
+          },
+        },
+      };
+
+      const { saveActiveRunState } = await import(
+        "../../src/import-lifecycle/run-state"
+      );
+
+      const result = await startImport(context);
+
+      expect(result).toEqual({ result: "start import" });
+      expect(saveActiveRunState).toHaveBeenCalledWith(
+        "import-123",
+        expect.objectContaining({
+          executionId: "exec-test-id-123",
+          controllerJobId: "mock-job-id-123",
+          cancelUrl: expect.stringContaining("/cancel"),
+          getExecutionStatusUrl: expect.any(String),
+          startedAt: expect.any(String),
+          state: "running",
+        }),
+      );
     });
   });
 

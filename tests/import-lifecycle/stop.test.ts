@@ -47,6 +47,7 @@ vi.mock("@forge/api", () => ({
     });
     return result;
   },
+  assumeTrustedRoute: (url: string) => url,
   default: {
     asApp: () => ({
       requestJira: mockRequestJira,
@@ -69,6 +70,12 @@ vi.mock("../../src/resolvers/controller-resolver", () => ({
   },
 }));
 
+// Mock the run-state module so tests control what stored state looks like
+vi.mock("../../src/import-lifecycle/run-state", () => ({
+  getActiveRunState: vi.fn().mockResolvedValue(null),
+  clearActiveRunState: vi.fn().mockResolvedValue(undefined),
+}));
+
 describe("stopImport - Lifecycle Extension Point", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -81,6 +88,88 @@ describe("stopImport - Lifecycle Extension Point", () => {
     // Silence console output during tests
     vi.spyOn(console, "log").mockImplementation(() => {});
     vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
+  describe("stored active run state", () => {
+    it("cancels via the stored cancelUrl and controller job even without context executionId", async () => {
+      const { getActiveRunState, clearActiveRunState } = await import(
+        "../../src/import-lifecycle/run-state"
+      );
+      vi.mocked(getActiveRunState).mockResolvedValueOnce({
+        executionId: "exec-stored-1",
+        controllerJobId: "job-stored-1",
+        cancelUrl:
+          "/jsm/assets/workspace/workspace-456/v1/importsource/import-123/executions/exec-stored-1/cancel",
+        getExecutionStatusUrl:
+          "/jsm/assets/workspace/workspace-456/v1/importsource/import-123/executions/exec-stored-1",
+        startedAt: "2026-07-25T00:00:00.000Z",
+        state: "running",
+      });
+
+      const context: AssetsImportContext = {
+        contextToken: "test-token",
+        importId: "import-123",
+        workspaceId: "workspace-456",
+        schemaId: "schema-789",
+        // No context.extension.executionId available
+        context: undefined,
+      };
+
+      const { controllerQueue } = await import(
+        "../../src/resolvers/controller-resolver"
+      );
+
+      const result = await stopImport(context);
+
+      expect(result).toEqual({ result: "stop import" });
+      expect(mockRequestJira).toHaveBeenCalledWith(
+        "/jsm/assets/workspace/workspace-456/v1/importsource/import-123/executions/exec-stored-1/cancel",
+        expect.objectContaining({ method: "DELETE" }),
+      );
+      expect(controllerQueue.getJob).toHaveBeenCalledWith("job-stored-1");
+      expect(mockJobProgress.cancel).toHaveBeenCalled();
+      expect(clearActiveRunState).toHaveBeenCalledWith("import-123");
+    });
+
+    it("falls back to context-reconstructed cancel when no active run state is stored", async () => {
+      const { getActiveRunState, clearActiveRunState } = await import(
+        "../../src/import-lifecycle/run-state"
+      );
+      vi.mocked(getActiveRunState).mockResolvedValueOnce(null);
+
+      const context: AssetsImportContext = {
+        contextToken: "test-token",
+        importId: "import-123",
+        workspaceId: "workspace-456",
+        schemaId: "schema-789",
+        context: {
+          accountId: "test-account",
+          cloudId: "test-cloud",
+          localId: "test-local",
+          moduleKey: "test-module",
+          extension: {
+            importId: "import-123",
+            workspaceId: "workspace-456",
+            schemaId: "schema-789",
+            executionId: "exec-abc-123",
+            type: "jiraServiceManagement:assetsImportType",
+          },
+          userAccess: {
+            enabled: true,
+            hasAccess: true,
+          },
+        },
+      };
+
+      const result = await stopImport(context);
+
+      expect(result).toEqual({ result: "stop import" });
+      expect(mockRequestJira).toHaveBeenCalledWith(
+        "/jsm/assets/workspace/workspace-456/v1/importsource/import-123/executions/exec-abc-123/cancel",
+        expect.objectContaining({ method: "DELETE" }),
+      );
+      expect(clearActiveRunState).not.toHaveBeenCalled();
+    });
   });
 
   describe("cancellation behavior", () => {

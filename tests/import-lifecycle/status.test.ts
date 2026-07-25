@@ -42,6 +42,12 @@ vi.mock("@forge/api", () => ({
     // Mock route template function
     return strings.reduce((acc, str, i) => acc + str + (values[i] || ""), "");
   },
+  assumeTrustedRoute: (url: string) => url,
+}));
+
+vi.mock("../../src/import-lifecycle/run-state", () => ({
+  getActiveRunState: vi.fn().mockResolvedValue(null),
+  saveLatestOutcome: vi.fn().mockResolvedValue(undefined),
 }));
 
 describe("importStatus - Lifecycle Extension Point", () => {
@@ -448,6 +454,151 @@ describe("importStatus - Lifecycle Extension Point", () => {
 
       // Should not throw
       await expect(importStatus(context)).resolves.toBeDefined();
+    });
+  });
+
+  describe("terminal execution reconciliation", () => {
+    const context: AssetsImportContext = {
+      contextToken: "test-token",
+      importId: "import-123",
+      workspaceId: "workspace-456",
+      schemaId: "schema-789",
+      context: undefined,
+    };
+
+    const activeRunState = {
+      executionId: "exec-1",
+      controllerJobId: "job-1",
+      cancelUrl: "/executions/exec-1/cancel",
+      getExecutionStatusUrl: "/executions/exec-1",
+      startedAt: "2026-07-25T00:00:00.000Z",
+      state: "running" as const,
+    };
+
+    async function mockRequestJiraFor(executionStatusBody: unknown) {
+      const api = await import("@forge/api");
+      const mockRequestJira = vi.fn(async (endpoint: string) => {
+        if (endpoint.includes("configstatus")) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ status: "IDLE" }),
+            text: async () => "",
+          };
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: async () => executionStatusBody,
+          text: async () => "",
+        };
+      });
+      vi.mocked(api.default.asApp).mockReturnValue({
+        requestJira: mockRequestJira,
+      } as never);
+      return mockRequestJira;
+    }
+
+    it("promotes a DONE execution status to a confirmed-done outcome with counts", async () => {
+      const { getActiveRunState, saveLatestOutcome } = await import(
+        "../../src/import-lifecycle/run-state"
+      );
+      vi.mocked(getActiveRunState).mockResolvedValueOnce(activeRunState);
+      await mockRequestJiraFor({
+        status: "DONE",
+        progressResult: {
+          entriesCreated: 5,
+          entriesUpdated: 2,
+          entriesFailed: 0,
+          entriesProcessed: 7,
+        },
+      });
+
+      await importStatus(context);
+
+      expect(saveLatestOutcome).toHaveBeenCalledWith(
+        "import-123",
+        expect.objectContaining({
+          outcome: "confirmed-done",
+          recordedAt: expect.any(String),
+          counts: {
+            entriesCreated: 5,
+            entriesUpdated: 2,
+            entriesFailed: 0,
+            entriesProcessed: 7,
+          },
+        }),
+      );
+    });
+
+    it("promotes a CANCELLED execution status to a confirmed-cancelled outcome", async () => {
+      const { getActiveRunState, saveLatestOutcome } = await import(
+        "../../src/import-lifecycle/run-state"
+      );
+      vi.mocked(getActiveRunState).mockResolvedValueOnce(activeRunState);
+      await mockRequestJiraFor({ status: "CANCELLED" });
+
+      await importStatus(context);
+
+      expect(saveLatestOutcome).toHaveBeenCalledWith(
+        "import-123",
+        expect.objectContaining({ outcome: "confirmed-cancelled" }),
+      );
+    });
+
+    it("does not record an outcome for non-terminal execution status", async () => {
+      const { getActiveRunState, saveLatestOutcome } = await import(
+        "../../src/import-lifecycle/run-state"
+      );
+      vi.mocked(getActiveRunState).mockResolvedValueOnce(activeRunState);
+      await mockRequestJiraFor({ status: "INGESTING" });
+
+      await importStatus(context);
+
+      expect(saveLatestOutcome).not.toHaveBeenCalled();
+    });
+
+    it("does not attempt reconciliation when there is no active run state", async () => {
+      const { getActiveRunState, saveLatestOutcome } = await import(
+        "../../src/import-lifecycle/run-state"
+      );
+      vi.mocked(getActiveRunState).mockResolvedValueOnce(null);
+      const mockRequestJira = await mockRequestJiraFor({ status: "DONE" });
+
+      await importStatus(context);
+
+      expect(saveLatestOutcome).not.toHaveBeenCalled();
+      expect(mockRequestJira).not.toHaveBeenCalledWith(
+        expect.stringContaining("/executions/exec-1"),
+        expect.any(Object),
+      );
+    });
+
+    it("does not throw when the execution status lookup fails (best-effort)", async () => {
+      const { getActiveRunState, saveLatestOutcome } = await import(
+        "../../src/import-lifecycle/run-state"
+      );
+      vi.mocked(getActiveRunState).mockResolvedValueOnce(activeRunState);
+      const api = await import("@forge/api");
+      const configStatusMock = vi.fn(async (endpoint: string) => {
+        if (endpoint.includes("configstatus")) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ status: "IDLE" }),
+            text: async () => "",
+          };
+        }
+        throw new Error("network error");
+      });
+      vi.mocked(api.default.asApp).mockReturnValue({
+        requestJira: configStatusMock,
+      } as never);
+
+      await expect(importStatus(context)).resolves.toEqual({
+        status: ForgeImportStatus.READY,
+      });
+      expect(saveLatestOutcome).not.toHaveBeenCalled();
     });
   });
 

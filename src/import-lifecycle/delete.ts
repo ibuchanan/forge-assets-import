@@ -5,15 +5,20 @@
 
 import type { AssetsImportContext, ImportResult } from "../assets/types";
 import { logContext, logStructured } from "../forge/logging";
+import { clearActiveRunState, clearLatestOutcome } from "./run-state";
 
 export async function onDeleteImport(
   context: AssetsImportContext,
 ): Promise<ImportResult> {
   logContext(context, "onDeleteImport");
+  const { importId } = context;
+
+  await clearActiveRunState(importId);
+  await clearLatestOutcome(importId);
+
   logStructured("info", "onDeleteImport", "Import deleted", {
-    importId: context.importId,
+    importId,
   });
-  // No cleanup needed - all state is transient
   return {
     result: "on delete import",
   };

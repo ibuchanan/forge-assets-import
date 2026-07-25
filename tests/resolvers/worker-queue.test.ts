@@ -32,6 +32,12 @@ vi.mock("../../src/external/dummyjson-client", async (importOriginal) => ({
   fetchProductsBatch: fetchProductsBatchMock,
 }));
 
+const saveLatestOutcomeMock = vi.hoisted(() => vi.fn());
+
+vi.mock("../../src/import-lifecycle/run-state", () => ({
+  saveLatestOutcome: saveLatestOutcomeMock,
+}));
+
 import { handler } from "../../src/resolvers/worker-resolver";
 
 const baseWorkItem = {
@@ -59,6 +65,7 @@ describe("Worker Queue - Behavior Tests", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     requestJiraMock.mockResolvedValue(makeOkResponse());
+    saveLatestOutcomeMock.mockResolvedValue(undefined);
   });
 
   it("submits data using the work item batch size and enqueues the next batch", async () => {
@@ -123,6 +130,32 @@ describe("Worker Queue - Behavior Tests", () => {
     expect(progressCall).toBeUndefined();
 
     expect(workerQueuePushMock).not.toHaveBeenCalled();
+  });
+
+  it("records a submission-complete outcome when the final batch submits successfully", async () => {
+    fetchProductsBatchMock.mockResolvedValue({
+      products: [{ id: 1 }],
+      total: 40,
+      skip: 30,
+      limit: 25,
+    });
+
+    await handler({
+      body: {
+        ...baseWorkItem,
+        skip: 30,
+        limit: 25,
+        total: 40,
+      },
+    } as AsyncEvent);
+
+    expect(saveLatestOutcomeMock).toHaveBeenCalledWith(
+      baseWorkItem.importConfigurationId,
+      expect.objectContaining({
+        outcome: "submission-complete",
+        recordedAt: expect.any(String),
+      }),
+    );
   });
 
   it("skips processing when required work item fields are missing", async () => {

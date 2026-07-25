@@ -3,12 +3,11 @@
  * Triggered when user cancels an active import in Assets UI
  */
 
-import { kvs } from "@forge/kvs";
-import { cancelExecution } from "../assets/import-client";
+import { cancelExecution, cancelExecutionByUrl } from "../assets/import-client";
 import type { AssetsImportContext, ImportResult } from "../assets/types";
 import { logContext, logStructured } from "../forge/logging";
-import { getJobIdStorageKey } from "../forge/storage";
 import { controllerQueue } from "../resolvers/controller-resolver";
+import { clearActiveRunState, getActiveRunState } from "./run-state";
 
 export async function stopImport(
   context: AssetsImportContext,
@@ -16,45 +15,54 @@ export async function stopImport(
   logContext(context, "stopImport");
   const { importId, workspaceId } = context;
 
-  // Check if there's an active execution to cancel
-  // The context may include executionId in the extension object
+  const activeRunState = await getActiveRunState(importId);
+
+  if (activeRunState) {
+    await cancelExecutionByUrl(activeRunState.cancelUrl);
+
+    try {
+      const jobProgress = controllerQueue.getJob(
+        activeRunState.controllerJobId,
+      );
+      await jobProgress.cancel();
+    } catch (error) {
+      logStructured("warn", "stopImport", "Failed to cancel job", {
+        importsourceId: importId,
+        workspaceId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    await clearActiveRunState(importId);
+
+    logStructured("info", "stopImport", "Import stopped", {
+      importsourceId: importId,
+      workspaceId,
+      jobCancelled: true,
+      executionCancelled: true,
+      executionId: activeRunState.executionId,
+    });
+
+    return {
+      result: "stop import",
+    };
+  }
+
+  // No stored active run state - fall back to reconstructing the cancel
+  // request from context.extension, if available.
   const executionId = context.context?.extension?.executionId;
 
   if (executionId && workspaceId) {
     await cancelExecution(workspaceId, importId, executionId);
   }
 
-  // Cancel the queued jobs to prevent pending events from being processed
-  try {
-    const jobId = await kvs.get(getJobIdStorageKey(importId));
-    if (jobId) {
-      const jobProgress = controllerQueue.getJob(jobId as string);
-      await jobProgress.cancel();
-      await kvs.delete(getJobIdStorageKey(importId));
-      logStructured("info", "stopImport", "Import stopped", {
-        importsourceId: importId,
-        workspaceId,
-        jobCancelled: true,
-        executionCancelled: !!executionId,
-        executionId,
-      });
-    } else {
-      logStructured("info", "stopImport", "Import stopped", {
-        importsourceId: importId,
-        workspaceId,
-        jobCancelled: false,
-        executionCancelled: !!executionId,
-        executionId,
-      });
-    }
-  } catch (error) {
-    logStructured("warn", "stopImport", "Failed to cancel job", {
-      importsourceId: importId,
-      workspaceId,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    // Don't re-throw - we still want to complete the lifecycle even if job cancellation fails
-  }
+  logStructured("info", "stopImport", "Import stopped", {
+    importsourceId: importId,
+    workspaceId,
+    jobCancelled: false,
+    executionCancelled: !!executionId,
+    executionId,
+  });
 
   return {
     result: "stop import",

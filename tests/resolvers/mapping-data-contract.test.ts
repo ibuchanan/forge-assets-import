@@ -35,6 +35,10 @@ vi.mock("../../src/external/dummyjson-client", async (importOriginal) => ({
   fetchProductsBatch: vi.fn(),
 }));
 
+vi.mock("../../src/import-lifecycle/run-state", () => ({
+  saveLatestOutcome: vi.fn().mockResolvedValue(undefined),
+}));
+
 const buildOkResponse = (payload: unknown) => ({
   ok: true,
   status: 200,

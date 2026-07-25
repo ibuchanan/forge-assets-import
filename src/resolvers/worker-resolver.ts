@@ -9,6 +9,7 @@ import {
   toProductRecord,
 } from "../external/dummyjson-client";
 import { logStructured } from "../forge/logging";
+import { saveLatestOutcome } from "../import-lifecycle/run-state";
 import type { WorkItem } from "../types/queue";
 
 /**
@@ -131,12 +132,14 @@ export function isValidWorkItem(workItem: WorkItem): boolean {
  * Assets applies the mapping (configured during the frontend phase) server-side,
  * matching attribute locators against these normalized field names.
  *
+ * @param importConfigurationId - The import source ID, used to record the run outcome
  * @param submitResultsUrl - The HATEOAS URL for submitting data (from Assets execution response)
  * @param products - Normalized product records (see toProductRecord)
  * @param clientGeneratedId - Unique identifier for this data submission
  * @param completed - Whether this is the final batch
  */
 async function submitData(
+  importConfigurationId: string,
   submitResultsUrl: string,
   products: Array<Record<string, unknown>>,
   clientGeneratedId: string,
@@ -173,6 +176,11 @@ async function submitData(
 
   // Only log completion or errors - don't log every batch to reduce noise
   if (completed) {
+    await saveLatestOutcome(importConfigurationId, {
+      outcome: "submission-complete",
+      recordedAt: new Date().toISOString(),
+    });
+
     logStructured("debug", "submitData", "Submitted final batch", {
       productCount: products.length,
       clientGeneratedId,
@@ -232,6 +240,7 @@ const handleWork = async (workItem: WorkItem): Promise<void> => {
     // matching attribute locators against these normalized field names.
     // Use the HATEOAS URL fetched from Assets instead of storing it in queue.
     await submitData(
+      importConfigurationId,
       submitResultsUrl,
       products.map(toProductRecord) as unknown as Array<
         Record<string, unknown>
