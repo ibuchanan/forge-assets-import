@@ -28,11 +28,24 @@ This app demonstrates the full import integration pattern:
 
 [DummyJSON](https://dummyjson.com/docs/products) is used as a stand-in external data source
 (a public fake store API that returns product records).
-Replace it with your own external system client in `src/external/`.
+Replace it with your own external system client in `src/external/`;
+the external source's egress domain is declared in `manifest.yml` under
+`permissions.external.fetch` and needs updating too.
 
 See the
 [Forge Async Events API diagram](https://dac-static.atlassian.com/platform/forge/images/assets-import-async-events-api-example.png?_v=1.5800.340)
 for a visual overview of the controller/worker queue pattern.
+
+## What kind of project this is
+
+This is a **maintained reference app**, not a production integration and not
+an archival sample. The DummyJSON product scenario is intentionally small
+and artificial — it exists to demonstrate the Assets Import lifecycle end to
+end, not to model a realistic customer integration. What *is* meant to be
+taken seriously is the quality bar behind it; see
+[Development](#development) below and
+[`docs/adr/0001-maintain-reference-app-quality.md`](docs/adr/0001-maintain-reference-app-quality.md)
+for the reasoning.
 
 ## Mapping configuration and the Insight JSON selector
 
@@ -60,87 +73,63 @@ Join the Forge conversation in
 See [Set up Forge](https://developer.atlassian.com/platform/forge/set-up-forge/) for full setup instructions.
 At minimum, you need:
 
-- Node.js and npm for installing dependencies and running local checks.
+- Node.js (see `.nvmrc`/`engines.node` — `24.x`) and npm for installing dependencies.
 - The Forge CLI, installed and authenticated with `forge login`.
-- Access to an Atlassian site with Jira Service Management and Assets.
-- Permission to install Forge apps on that site.
+- Access to an Atlassian site with Jira Service Management and Assets, and
+  permission to install Forge apps on it, if you intend to deploy or install
+  the app (not required just to run the local quality checks — see
+  [Development](#development)).
 
 ## Quick start
 
-Register the app (once per developer, writes your app ID into `manifest.yml`):
-```
-forge register
-```
-
 Install dependencies:
-```
+
+```sh
 npm install
 ```
 
-Validate the app (formats, type-checks, lints, and tests):
-```
-npm run check
+Register the app (once per developer, writes your app ID into `manifest.yml`):
+
+```sh
+forge register
 ```
 
-Deploy your app using the interactive Forge command:
-```
+Deploy your code:
+
+```sh
 forge deploy
 ```
 
-Install your app on an Atlassian site using the interactive Forge command:
-```
+Install the app on an Atlassian site:
+
+```sh
 forge install
 ```
 
-After the app has been deployed and installed on a site,
-develop it locally using `forge tunnel` to proxy development-environment invocations to your local code:
-```
+After the app is deployed and installed on a site, develop against it without
+redeploying for every change:
+
+```sh
 forge tunnel
 ```
 
-Additional scripts in `package.json`:
-- `npm run todo` — lists all TODO comments in the source tree.
-- `npm run changelog` — generates a changelog from git history using [git-cliff](https://git-cliff.org/).
+Notes:
 
-## Local quality tooling (Git hooks)
-
-`lefthook.yml` is the single source of truth for which checks make up the
-lint pass and the pre-push gate — `npm run lint` and `npm run check` delegate
-to it (`lefthook run lint` and `lefthook run pre-push --force`) instead of
-re-listing the same commands in `package.json`.
-
-`npm install` runs the `prepare` script (`lefthook install`), which wires up
-this repo's local [Lefthook](https://lefthook.dev/) hooks:
-- **pre-commit** runs a `gitleaks` secret scan, plus `npm run format:check`
-  and `npm run lint:check` against changed files.
-- **pre-push** runs `npm run format:check`, the full `lint` group (Forge
-  prelint, Biome lint, typecheck, `forge lint`), and `npm run test`. `npm run
-  check` runs this same pre-push group directly, so there's no separate gate
-  to keep in sync.
-
-Prerequisites:
-- The Forge CLI must be installed and authenticated (`forge login`) for the
-  `forge lint` step.
-- The `@forge-ahead/prelint` dev dependency must resolve during `npm install`
-  for the `lint:prelint` (`ast-grep`) step.
-- [`gitleaks`](https://github.com/gitleaks/gitleaks) must be installed and on
-  `PATH` for the pre-commit secret scan.
-
-You can run any hook group manually without committing or pushing:
-```
-npx lefthook run pre-commit
-npx lefthook run pre-push --force
-npx lefthook run lint
-```
-
-### Notes
 - Use `forge deploy` when you want to persist code changes.
-- Use `forge install` when you want to install the app on a new site.
-  Once installed, subsequent deploys are picked up automatically without reinstalling —
-  unless you add new scopes or egress rules, in which case run `forge install --upgrade`.
-- The external data source (DummyJSON) is declared in `manifest.yml` under `permissions.external.fetch`.
-  Update this entry when pointing the app at a different external system.
-- Assets API TypeScript types live in `src/types/`. See [`src/types/README.md`](src/types/README.md) for details on type generation and maintenance.
+- Use `forge install` when you want to install the app on a new site. Once
+  installed, subsequent deploys are picked up automatically without
+  reinstalling — unless you add new scopes or egress rules, in which case run
+  `forge install --upgrade`.
+
+For non-interactive, scripted equivalents of these commands, see
+[Development](#development).
+
+## Development
+
+Contributing to this repo, running its local quality toolchain (formatting,
+linting, Forge prelint, typechecking, tests, bundle size checks), and
+understanding its structure are covered in
+[`DEVELOPMENT.md`](DEVELOPMENT.md).
 
 ## Contributions
 
@@ -153,4 +142,3 @@ Copyright (c) 2025–2026 Atlassian US., Inc.
 Apache 2.0 licensed, see [LICENSE](LICENSE) file.
 
 [![With ❤️ from Atlassian](https://raw.githubusercontent.com/atlassian-internal/oss-assets/master/banner-with-thanks-light.png)](https://www.atlassian.com)
-
