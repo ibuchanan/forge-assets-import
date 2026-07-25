@@ -8,29 +8,13 @@
  * Triggered when user clicks "Import data" button in Assets UI
  */
 
-import api, { route } from "@forge/api";
 import type { PushResult } from "@forge/events";
 import { kvs } from "@forge/kvs";
+import { startExecution } from "../assets/import-client";
 import type { AssetsImportContext, ImportResult } from "../assets/types";
 import { logContext, logStructured } from "../forge/logging";
 import { getJobIdStorageKey } from "../forge/storage";
 import { controllerQueue } from "../resolvers/controller-resolver";
-
-/**
- * Extracts the execution ID from the submitResults URL
- * The URL format is: /jsm/assets/workspace/{workspaceId}/v1/importsource/{importId}/executions/{executionId}/data
- */
-function extractExecutionId(submitResultsUrl: string): string {
-  const urlParts = submitResultsUrl.split("/");
-  // The execution ID is located before '/data' in the URL path
-  const executionId = urlParts[urlParts.length - 2];
-  if (!executionId) {
-    throw new Error(
-      `Failed to extract executionId from URL: ${submitResultsUrl}`,
-    );
-  }
-  return executionId;
-}
 
 export async function startImport(
   context: AssetsImportContext,
@@ -49,24 +33,13 @@ export async function startImport(
 
   try {
     // Create a new execution via Assets API
-    const endpoint = route`/jsm/assets/workspace/${workspaceId}/v1/importsource/${importId}/executions`;
-    const newlyCreatedExecution = await api.asApp().requestJira(endpoint, {
-      method: "POST",
-    });
-
-    if (!newlyCreatedExecution.ok) {
-      const errorText = await newlyCreatedExecution.text();
-      throw new Error(
-        `Failed to create import execution: ${newlyCreatedExecution.status} ${errorText}`,
-      );
-    }
-
-    const newlyCreatedExecutionJson = await newlyCreatedExecution.json();
-
-    // Extract the execution ID from the response
-    const executionId = extractExecutionId(
-      newlyCreatedExecutionJson.links.submitResults,
-    );
+    const {
+      executionId,
+      submitResultsUrl,
+      submitProgressUrl,
+      getExecutionStatusUrl,
+      cancelUrl,
+    } = await startExecution(workspaceId, importId);
 
     // Push event onto controller queue to start data ingestion process.
     // Include HATEOAS links from Assets so queue handlers don't need to reconstruct URLs.
@@ -80,10 +53,10 @@ export async function startImport(
       limit: 30, // Will be overridden by controller, but needed for queue schema
       total: 0, // Will be determined by controller, but needed for queue schema
       // HATEOAS links from execution creation response
-      submitResultsUrl: newlyCreatedExecutionJson.links.submitResults,
-      submitProgressUrl: newlyCreatedExecutionJson.links.submitProgress,
-      getExecutionStatusUrl: newlyCreatedExecutionJson.links.getExecutionStatus,
-      cancelUrl: newlyCreatedExecutionJson.links.cancel,
+      submitResultsUrl,
+      submitProgressUrl,
+      getExecutionStatusUrl,
+      cancelUrl,
     };
 
     const pushResult: PushResult = await controllerQueue.push({

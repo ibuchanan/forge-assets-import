@@ -3,76 +3,12 @@
  * Triggered when user cancels an active import in Assets UI
  */
 
-import api, { route } from "@forge/api";
 import { kvs } from "@forge/kvs";
+import { cancelExecution } from "../assets/import-client";
 import type { AssetsImportContext, ImportResult } from "../assets/types";
 import { logContext, logStructured } from "../forge/logging";
 import { getJobIdStorageKey } from "../forge/storage";
 import { controllerQueue } from "../resolvers/controller-resolver";
-
-/**
- * Cancel an active import execution via the Assets API.
- *
- * This calls the cancel endpoint to stop the import and transition
- * the execution to CANCELLED state.
- *
- * @param workspaceId - The Assets workspace ID
- * @param importId - The import source ID
- * @param executionId - The execution ID to cancel
- */
-async function cancelExecution(
-  workspaceId: string,
-  importId: string,
-  executionId: string,
-): Promise<void> {
-  try {
-    // Note: We don't have the cancel URL from HATEOAS here because stop lifecycle
-    // doesn't receive it. We have to construct it from the context.
-    const cancelEndpoint = route`/jsm/assets/workspace/${workspaceId}/v1/importsource/${importId}/executions/${executionId}/cancel`;
-
-    const response = await api.asApp().requestJira(cancelEndpoint, {
-      method: "DELETE",
-      headers: {
-        Accept: "application/json",
-      },
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      logStructured("warn", "cancelExecution", "Failed to cancel execution", {
-        importsourceId: importId,
-        workspaceId,
-        executionId,
-        statusCode: response.status,
-        error: errorText,
-        api: {
-          method: "DELETE",
-          path: `/importsource/${importId}/executions/${executionId}/cancel`,
-        },
-      });
-      // Don't throw - cancellation is best-effort
-      return;
-    }
-
-    logStructured("info", "cancelExecution", "Cancelled execution", {
-      importsourceId: importId,
-      workspaceId,
-      executionId,
-      api: {
-        method: "DELETE",
-        path: `/importsource/${importId}/executions/${executionId}/cancel`,
-      },
-    });
-  } catch (error) {
-    logStructured("warn", "cancelExecution", "Error cancelling execution", {
-      importsourceId: importId,
-      workspaceId,
-      executionId,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    // Don't throw - allow the lifecycle to complete even if cancellation fails
-  }
-}
 
 export async function stopImport(
   context: AssetsImportContext,

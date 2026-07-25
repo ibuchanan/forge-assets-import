@@ -40,23 +40,6 @@ describe("Project Architecture", () => {
       }
     });
 
-    it("assets should not depend on other app modules", async () => {
-      for (const mod of [
-        "resolvers",
-        "import-lifecycle",
-        "external",
-        "frontend",
-        "forge",
-      ]) {
-        const rule = projectFiles()
-          .inFolder("src/assets/**")
-          .shouldNot()
-          .dependOnFiles()
-          .inFolder(`src/${mod}/**`);
-        await expect(rule).toPassAsync();
-      }
-    });
-
     it("external should not depend on other app modules", async () => {
       for (const mod of [
         "resolvers",

@@ -1,11 +1,12 @@
-import api, { assumeTrustedRoute } from "@forge/api";
 import type { AsyncEvent } from "@forge/events";
 import { Queue } from "@forge/events";
+import {
+  submitData as submitDataToAssets,
+  submitProgress,
+} from "../assets/import-client";
 import { fetchProductsBatch } from "../external/dummyjson-client";
-import { toRelativePath } from "../forge/api-path";
 import { logStructured } from "../forge/logging";
 import type { WorkItem } from "../types/queue";
-import { validateHttpResponse } from "../util/error";
 
 /**
  * Architecture: Sans-I/O pattern
@@ -122,60 +123,6 @@ export function isValidWorkItem(workItem: WorkItem): boolean {
 }
 
 /**
- * Report progress to Assets during data ingestion.
- *
- * This provides real-time feedback in the Assets UI about how many objects
- * have been processed so far.
- *
- * @param submitProgressUrl - The HATEOAS URL for progress reporting (from Assets execution response)
- * @param total - Total number of objects to import
- * @param processed - Number of objects processed so far
- */
-async function submitProgress(
-  submitProgressUrl: string,
-  total: number,
-  processed: number,
-): Promise<void> {
-  try {
-    const response = await api
-      .asApp()
-      .requestJira(assumeTrustedRoute(toRelativePath(submitProgressUrl)), {
-        method: "PUT",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          objects: {
-            total,
-            processed,
-          },
-        }),
-      });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      logStructured("warn", "submitProgress", "Failed to report progress", {
-        processed,
-        total,
-        statusCode: response.status,
-        error: errorText,
-        api: { method: "PUT", path: "/progress" },
-      });
-      // Don't throw - progress reporting is optional/best-effort
-      return;
-    }
-  } catch (error) {
-    // Progress reporting failures shouldn't stop the import
-    logStructured("warn", "submitProgress", "Error reporting progress", {
-      processed,
-      total,
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
-}
-
-/**
  * Submit a batch of raw product data to the Assets Import execution.
  *
  * Assets applies the mapping (configured during the frontend phase) server-side,
@@ -192,39 +139,16 @@ async function submitData(
   clientGeneratedId: string,
   completed: boolean,
 ): Promise<void> {
-  // Use the HATEOAS URL directly instead of reconstructing it
-  // Note: submitResultsUrl is a full URL from Assets, not a route template
-
-  const payload = {
-    data: {
-      products,
-    },
+  const result = await submitDataToAssets(
+    submitResultsUrl,
+    products,
     clientGeneratedId,
     completed,
-  };
-
-  // Use assumeTrustedRoute because submitResultsUrl comes from Assets' HATEOAS response
-  // which is a trusted source (the platform itself)
-  const response = await api
-    .asApp()
-    .requestJira(assumeTrustedRoute(toRelativePath(submitResultsUrl)), {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-
-  // Validate HTTP response using Result pattern
-  const validationResult = await validateHttpResponse(
-    response,
-    "submit import data",
   );
 
-  if (validationResult.isErr()) {
+  if (result.isErr()) {
     // At Forge boundary - decide whether to retry based on error type
-    const error = new Error(validationResult.error.detail);
+    const error = new Error(result.error.detail);
     if (shouldRetryError(error)) {
       // Retriable error (5xx, network, timeout) - throw to trigger Forge retry
       throw error;
@@ -236,7 +160,7 @@ async function submitData(
         "Non-retriable error submitting batch",
         {
           clientGeneratedId,
-          error: validationResult.error.detail,
+          error: result.error.detail,
           api: { method: "POST", path: "/data" },
         },
       );

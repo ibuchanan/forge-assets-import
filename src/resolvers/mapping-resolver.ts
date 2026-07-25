@@ -5,18 +5,14 @@
  * where we have proper logging and can debug Assets API responses.
  */
 
-import api, { route } from "@forge/api";
+import { getSchemaAndMapping, submitMapping } from "../assets/import-client";
 import { logStructured } from "../forge/logging";
 import type { ProblemDetails } from "../util/error";
 import {
   errAsync,
-  extractOrCreateProblemDetails,
-  ok,
   okAsync,
   problemDetails,
-  ResultAsync,
-  StandardError,
-  validateHttpResponse,
+  type ResultAsync,
 } from "../util/error";
 
 /**
@@ -91,80 +87,6 @@ export const FIELD_TO_ATTRIBUTE_MAP: Record<string, string> = {
   rating: "Rating",
   stock: "Stock",
 };
-
-/**
- * Schema and Mapping response from Assets Import API
- */
-interface SchemaAndMappingResponse {
-  schema?: {
-    objectSchema?: {
-      name?: string;
-      description?: string;
-      objectTypes?: Array<{
-        externalId?: string;
-        name: string;
-        description?: string;
-        attributes?: Array<{
-          externalId?: string;
-          name: string;
-          description?: string;
-          type?: string;
-          minimumCardinality?: number;
-          maximumCardinality?: number;
-          unique?: boolean;
-        }>;
-      }>;
-    };
-  };
-  mapping?: {
-    objectTypeMappings?: Array<{
-      objectTypeExternalId?: string;
-      objectTypeName?: string;
-      selector?: string;
-      description?: string;
-      attributesMapping?: Array<{
-        attributeExternalId?: string;
-        attributeName?: string;
-        attributeLocators?: string[];
-        externalIdPart?: boolean;
-      }>;
-    }>;
-  };
-}
-
-/**
- * Fetch existing schema and mapping from Assets Import API
- * This returns the external IDs that Assets has already assigned
- */
-function fetchSchemaAndMapping(
-  workspaceId: string,
-  importId: string,
-): ResultAsync<SchemaAndMappingResponse, ProblemDetails> {
-  const endpoint = route`/jsm/assets/workspace/${workspaceId}/v1/importsource/${importId}/schema-and-mapping`;
-
-  return ResultAsync.fromPromise(
-    api.asApp().requestJira(endpoint, {
-      headers: {
-        Accept: "application/json",
-      },
-    }),
-    (error: unknown): ProblemDetails =>
-      extractOrCreateProblemDetails(error, "fetching schema and mapping"),
-  )
-    .andThen((response) => {
-      return validateHttpResponse(response, "fetch schema and mapping");
-    })
-    .andThen((validatedResponse) =>
-      ResultAsync.fromPromise(
-        validatedResponse.json() as Promise<SchemaAndMappingResponse>,
-        (error: unknown): ProblemDetails =>
-          extractOrCreateProblemDetails(
-            error,
-            "parsing schema and mapping JSON",
-          ),
-      ),
-    );
-}
 
 /**
  * Build attribute mappings using existing external IDs from Assets
@@ -286,7 +208,7 @@ export async function buildMappingBackend(
   }
 
   try {
-    const result = await fetchSchemaAndMapping(workspaceId, importId)
+    const result = await getSchemaAndMapping(workspaceId, importId)
       .andThen((schemaAndMapping) => {
         // Find the Product object type in the schema
         const objectTypes =
@@ -556,7 +478,7 @@ export async function submitMappingBackend(
     };
   }
 
-  const endpoint = route`/jsm/assets/workspace/${workspaceId}/v1/importsource/${importId}/mapping`;
+  const objectTypeMappings = mapping.mapping.objectTypeMappings;
 
   logStructured(
     "info",
@@ -565,6 +487,7 @@ export async function submitMappingBackend(
     {
       workspaceId,
       importId,
+      objectTypeMappingCount: objectTypeMappings.length,
       api: {
         method: "PUT",
         path: `/jsm/assets/workspace/${workspaceId}/v1/importsource/${importId}/mapping`,
@@ -572,116 +495,9 @@ export async function submitMappingBackend(
     },
   );
 
-  const objectTypeMappings = mapping.mapping.objectTypeMappings;
-
-  logStructured("debug", "submitMappingBackend", "Mapping payload prepared", {
-    workspaceId,
-    importId,
-    objectTypeMappingCount: objectTypeMappings.length,
-  });
-
   try {
-    const result = await ResultAsync.fromPromise(
-      api.asApp().requestJira(endpoint, {
-        method: "PUT",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(mapping),
-      }),
-      (error: unknown): ProblemDetails =>
-        extractOrCreateProblemDetails(error, "submitting mapping"),
-    )
-      .andThen((response) => {
-        logStructured(
-          "info",
-          "submitMappingBackend",
-          "Response received from Assets",
-          {
-            workspaceId,
-            importId,
-            statusCode: response.status,
-            statusText: response.statusText,
-          },
-        );
-
-        return ResultAsync.fromPromise(
-          (async () => {
-            if (!response.ok) {
-              // For error responses, parse JSON to get detailed validation errors
-              try {
-                const errorData = await response.json();
-                logStructured(
-                  "error",
-                  "submitMappingBackend",
-                  "Assets API validation error",
-                  {
-                    workspaceId,
-                    importId,
-                    statusCode: response.status,
-                    errorDetails: errorData,
-                  },
-                );
-
-                return StandardError.getOrDefault(response.status).error(
-                  `Failed to submit mapping: ${response.status} ${response.statusText} - ${JSON.stringify(errorData)}`,
-                );
-              } catch (_parseError) {
-                // If JSON parse fails, fall back to text
-                const errorText = await response.text();
-                logStructured(
-                  "error",
-                  "submitMappingBackend",
-                  "Assets API error (non-JSON response)",
-                  {
-                    workspaceId,
-                    importId,
-                    statusCode: response.status,
-                    errorText,
-                  },
-                );
-
-                return StandardError.getOrDefault(response.status).error(
-                  `Failed to submit mapping: ${response.status} ${response.statusText} - ${errorText}`,
-                );
-              }
-            }
-
-            // Log successful response
-            try {
-              const responseBody = await response.json();
-              logStructured(
-                "debug",
-                "submitMappingBackend",
-                "Response body from Assets",
-                {
-                  workspaceId,
-                  importId,
-                  responseBody,
-                },
-              );
-            } catch (_parseError) {
-              const responseText = await response.text();
-              logStructured(
-                "debug",
-                "submitMappingBackend",
-                "Response body from Assets",
-                {
-                  workspaceId,
-                  importId,
-                  responseText,
-                },
-              );
-            }
-
-            return ok(response);
-          })(),
-          (error: unknown): ProblemDetails =>
-            extractOrCreateProblemDetails(error, "parsing mapping response"),
-        ).andThen((result) => result);
-      })
-      .map((_response) => {
+    const result = await submitMapping(workspaceId, importId, mapping).map(
+      () => {
         logStructured(
           "info",
           "submitMappingBackend",
@@ -692,7 +508,8 @@ export async function submitMappingBackend(
           },
         );
         return true;
-      });
+      },
+    );
 
     if (result.isErr()) {
       logStructured(
