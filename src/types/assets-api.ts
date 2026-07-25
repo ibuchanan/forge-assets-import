@@ -1,13 +1,21 @@
 /**
  * Assets API Types (Subset)
  *
- * Manually defined types for the Assets Import API endpoints we use.
- * These are based on docs/assets/openapi.json but defined manually
- * because the OpenAPI spec doesn't provide sufficient type information.
+ * Hand-written types for the Assets Import API endpoints this app calls,
+ * based on actual API responses observed during development. The Assets
+ * Import OpenAPI spec doesn't declare JSON Schemas for these bodies (only
+ * examples), so generated types — whether from this repo's own
+ * `openapi-typescript` run or the packaged `@forge-ahead/atlassian-api-types`
+ * — can only type these bodies as `unknown`. See docs/api-type-audit.md for
+ * the full comparison.
  *
- * Note: The generated types in assets-api-generated.d.ts mostly use `unknown`
- * due to missing schema definitions in the OpenAPI spec, so we define these
- * types manually based on the actual API responses we've observed.
+ * Note: as of the audit, none of the interfaces below are actually imported
+ * by application code — see docs/api-type-audit.md, Finding 0. Real Assets
+ * Import response handling currently lives in scattered local interfaces in
+ * `src/resolvers/mapping-resolver.ts` and `src/import-lifecycle/status.ts`
+ * (and is untyped entirely in `src/import-lifecycle/start.ts`). This file is
+ * kept as a documented reference shape for whoever consolidates that drift,
+ * not as code currently wired into the app.
  */
 
 // ============================================================================
