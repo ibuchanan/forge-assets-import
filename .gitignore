@@ -256,7 +256,6 @@ $RECYCLE.BIN/
 # .pnp.*
 
 # End of https://www.toptal.com/developers/gitignore/api/visualstudiocode,linux,macos,windows,node,turbo,yarn
-src/types/assets-api-generated.d.ts
 
 # Test coverage
 coverage/
