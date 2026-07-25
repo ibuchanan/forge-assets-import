@@ -20,7 +20,7 @@ export const PRODUCT_FIELD_MAPPINGS: FieldMappingDefinition[] = [
   {
     sourceField: "key",
     assetsField: "Key",
-    sourceType: "number",
+    sourceType: "string",
     expectedAssetsType: "text",
     required: true,
     description: "Unique product identifier (used as external ID)",

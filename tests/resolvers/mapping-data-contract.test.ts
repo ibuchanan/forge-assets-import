@@ -144,7 +144,7 @@ describe("Mapping and Data Submission Contract", () => {
       data: {
         products: [
           {
-            key: 1,
+            key: "1",
             name: "Product 1",
             description: "A product",
             price: 9.99,

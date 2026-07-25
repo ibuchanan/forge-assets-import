@@ -1,12 +1,10 @@
 // Export with semantic naming convention for manifest
 export {
-  buildMapping,
   importConfigResolver,
   importStatus,
   onDeleteImport,
   startImport,
   stopImport,
-  submitMapping,
 } from "./resolvers";
 export {
   handler as controllerQueueConsumer,

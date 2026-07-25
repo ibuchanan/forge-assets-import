@@ -12,12 +12,8 @@ import ForgeReconciler, {
   Text,
 } from "@forge/react";
 import React, { useEffect, useState } from "react";
-
-interface AssetsImportExtension {
-  workspaceId: string;
-  importId: string;
-  schemaId: string;
-}
+import type { AssetsImportExtension } from "./save-mapping";
+import { saveMapping } from "./save-mapping";
 
 interface MappingRow {
   sourceField: string;
@@ -34,44 +30,6 @@ function extractInvokeBody<T>(response: T | { body: T }): T {
   }
   return response as T;
 }
-
-export const submitAssetMapping = async (
-  extension: AssetsImportExtension,
-  mapping: {
-    mapping: {
-      objectTypeMappings: Array<{
-        objectTypeExternalId: string;
-        objectTypeName: string;
-        selector: string;
-        attributesMapping: Array<{
-          attributeExternalId: string;
-          attributeName: string;
-          attributeLocators: string[];
-          externalIdPart?: boolean;
-        }>;
-      }>;
-    };
-  },
-): Promise<void> => {
-  const { workspaceId, importId } = extension;
-
-  const result = extractInvokeBody(
-    await invoke<{
-      success: boolean;
-      error?: { detail?: string };
-    }>("submitMapping", {
-      workspaceId,
-      importId,
-      mapping,
-    }),
-  );
-
-  if (!result.success) {
-    throw new Error(
-      result.error?.detail || "Failed to submit mapping configuration",
-    );
-  }
-};
 
 export const App = () => {
   const [context, setContext] = useState<FullContext | undefined>(undefined);
@@ -124,37 +82,9 @@ export const App = () => {
     setIsLoading(true);
 
     try {
-      // Build the mapping by calling backend resolver
-      // This allows proper logging and debugging of Assets API responses
-      const mappingResult = extractInvokeBody(
-        await invoke<{
-          success: boolean;
-          data?: unknown;
-          error?: { detail?: string };
-        }>("buildMapping", {
-          workspaceId: extension.workspaceId,
-          importId: extension.importId,
-        }),
-      );
-
-      if (!mappingResult.success || !mappingResult.data) {
-        // Handle error without throwing - show error flag directly
-        showFlag({
-          id: "mapping-error",
-          title: "Error",
-          type: "error",
-          description:
-            mappingResult.error?.detail ||
-            "Failed to build mapping configuration",
-        });
-        return;
-      }
-
-      // Submit the mapping to Assets Import API
-      await submitAssetMapping(
-        extension,
-        mappingResult.data as Parameters<typeof submitAssetMapping>[1],
-      );
+      // Build and submit the mapping in one backend operation, so the
+      // frontend never handles the mapping payload itself.
+      await saveMapping(extension);
 
       showFlag({
         id: "mapping-success",

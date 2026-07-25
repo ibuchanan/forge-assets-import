@@ -15,7 +15,7 @@ interface Product {
   discountPercentage: number;
   rating: number;
   stock: number;
-  brand: string;
+  brand?: string;
   category: string;
   thumbnail: string;
   images: string[];
@@ -34,12 +34,12 @@ interface ProductsResponse {
  * src/assets/product-mapping.ts.
  */
 export interface ProductRecord {
-  key: number;
+  key: string;
   name: string;
   description: string;
   price: number;
   category: string;
-  brand: string;
+  brand?: string;
   rating: number;
   stock: number;
 }
@@ -47,19 +47,25 @@ export interface ProductRecord {
 /**
  * Normalize a raw DummyJSON product into the Product record shape expected
  * by the Assets mapping's attribute locators (key, name, description, price,
- * category, brand, rating, stock).
+ * category, brand, rating, stock). Brand is omitted when the source product
+ * has none, matching the mapping's optional Brand attribute.
  */
 export function toProductRecord(product: Product): ProductRecord {
-  return {
-    key: product.id,
+  const record: ProductRecord = {
+    key: String(product.id),
     name: product.title,
     description: product.description,
     price: product.price,
     category: product.category,
-    brand: product.brand,
     rating: product.rating,
     stock: product.stock,
   };
+
+  if (product.brand) {
+    record.brand = product.brand;
+  }
+
+  return record;
 }
 
 /**

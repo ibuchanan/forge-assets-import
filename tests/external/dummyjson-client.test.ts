@@ -24,7 +24,7 @@ describe("toProductRecord", () => {
     };
 
     expect(toProductRecord(raw)).toEqual({
-      key: 1,
+      key: "1",
       name: "Essence Mascara Lash Princess",
       description: "A popular mascara.",
       price: 9.99,
@@ -33,5 +33,31 @@ describe("toProductRecord", () => {
       rating: 4.94,
       stock: 5,
     });
+  });
+
+  it("omits brand from the normalized record when the raw product has no brand", () => {
+    const raw = {
+      id: 2,
+      title: "Generic Widget",
+      description: "A widget with no brand.",
+      price: 4.99,
+      discountPercentage: 0,
+      rating: 3.5,
+      stock: 12,
+      category: "widgets",
+      thumbnail: "https://example.com/thumb.png",
+      images: ["https://example.com/image.png"],
+    };
+
+    expect(toProductRecord(raw)).toEqual({
+      key: "2",
+      name: "Generic Widget",
+      description: "A widget with no brand.",
+      price: 4.99,
+      category: "widgets",
+      rating: 3.5,
+      stock: 12,
+    });
+    expect(toProductRecord(raw)).not.toHaveProperty("brand");
   });
 });

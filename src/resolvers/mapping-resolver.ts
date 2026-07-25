@@ -467,6 +467,32 @@ export async function buildMappingPreviewBackend(
   return { success: true, data: result.value };
 }
 
+/**
+ * Build the Product attribute mapping from the current schema and submit it
+ * to Assets in one backend operation, so the frontend only needs to pass
+ * workspaceId and importId and never handles the mapping payload itself.
+ */
+export async function configureMappingBackend(
+  req: BuildMappingRequest,
+): Promise<{ success: boolean; error?: ProblemDetails }> {
+  const buildResult = await buildMappingBackend(req);
+
+  if (!buildResult.success || !buildResult.data) {
+    return buildResult.error
+      ? { success: false, error: buildResult.error }
+      : { success: false };
+  }
+
+  return submitMappingBackend({
+    payload: {
+      workspaceId: req.payload.workspaceId,
+      importId: req.payload.importId,
+      mapping: buildResult.data as SubmitMappingRequest["payload"]["mapping"],
+    },
+    context: req.context,
+  });
+}
+
 export async function submitMappingBackend(
   req: SubmitMappingRequest,
 ): Promise<{ success: boolean; error?: ProblemDetails }> {
