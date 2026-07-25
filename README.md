@@ -99,8 +99,39 @@ forge tunnel
 ```
 
 Additional scripts in `package.json`:
-- `npm run dev:todo` — lists all TODO comments in the source tree.
+- `npm run todo` — lists all TODO comments in the source tree.
 - `npm run changelog` — generates a changelog from git history using [git-cliff](https://git-cliff.org/).
+
+## Local quality tooling (Git hooks)
+
+`lefthook.yml` is the single source of truth for which checks make up the
+lint pass and the pre-push gate — `npm run lint` and `npm run check` delegate
+to it (`lefthook run lint` and `lefthook run pre-push --force`) instead of
+re-listing the same commands in `package.json`.
+
+`npm install` runs the `prepare` script (`lefthook install`), which wires up
+this repo's local [Lefthook](https://lefthook.dev/) hooks:
+- **pre-commit** runs a `gitleaks` secret scan, plus `npm run format:check`
+  and `npm run lint:check` against changed files.
+- **pre-push** runs `npm run format:check`, the full `lint` group (Forge
+  prelint, Biome lint, typecheck, `forge lint`), and `npm run test`. `npm run
+  check` runs this same pre-push group directly, so there's no separate gate
+  to keep in sync.
+
+Prerequisites:
+- The Forge CLI must be installed and authenticated (`forge login`) for the
+  `forge lint` step.
+- The `@forge-ahead/prelint` dev dependency must resolve during `npm install`
+  for the `lint:prelint` (`ast-grep`) step.
+- [`gitleaks`](https://github.com/gitleaks/gitleaks) must be installed and on
+  `PATH` for the pre-commit secret scan.
+
+You can run any hook group manually without committing or pushing:
+```
+npx lefthook run pre-commit
+npx lefthook run pre-push --force
+npx lefthook run lint
+```
 
 ### Notes
 - Use `forge deploy` when you want to persist code changes.
