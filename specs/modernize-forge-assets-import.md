@@ -243,6 +243,22 @@ Replace the stale generation story in a deliberate order:
 
 ### Iteration Zero: Tooling and package hygiene
 
+**Status: Complete.** Delivered via a nine-ticket sequence (formerly tracked
+in `specs/iteration-zero-tooling-tickets.md`, removed now that the work is
+done). See [`README.md`](../README.md) and [`DEVELOPMENT.md`](../DEVELOPMENT.md)
+for the current, living description of the resulting scripts and quality
+workflow; [`docs/tooling-baseline.md`](../docs/tooling-baseline.md) for the
+before-state this iteration started from; and
+[`docs/api-type-audit.md`](../docs/api-type-audit.md) for the
+`@forge-ahead/atlassian-api-types` audit outcome. The delivered shape differs
+from the sketch below in a few small ways worth knowing before reading it as
+literal: `lint` and `check` delegate to `lefthook run lint` /
+`lefthook run pre-push --force` rather than chaining npm scripts directly,
+and the prelint/API-types packages resolved as `@forge-ahead/prelint` and
+`@forge-ahead/atlassian-api-types` (both GitHub dependencies) rather than
+under the `tool-forge-prelint-ast-grep` name shown here. The rest of this
+section is left as the original plan for historical reference.
+
 Before broader architecture or code changes, make the example look and behave
 like the maintained Forge app packages from a tooling standpoint. This reduces
 noise in later refactors and makes failures easier to compare across the repo.
@@ -742,9 +758,10 @@ Also add the same manifest wiring guardrails used by the maintained apps for:
 
 ## Proposed Sequence
 
-0. Run Iteration Zero: align scripts, dev dependencies, Node engines,
+0. **Done.** Iteration Zero: align scripts, dev dependencies, Node engines,
    typecheck config, Forge command scripts, Lefthook/prelint, size checks, and
-   the `@forge-ahead/atlassian-api-types` audit.
+   the `@forge-ahead/atlassian-api-types` audit. See the Iteration Zero
+   section above for what shipped and where it's documented now.
 1. Add a local Assets Import client boundary.
 2. Replace the example's local execution/progress/data/cancel REST calls with
    that boundary.
