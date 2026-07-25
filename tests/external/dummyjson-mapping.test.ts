@@ -1,6 +1,6 @@
 /**
- * Tests to validate that the hardcoded mapping configuration
- * matches the actual structure of DummyJSON product data.
+ * Tests to validate that the structured Product field mapping configuration
+ * matches the actual structure of normalized DummyJSON product data.
  *
  * These tests catch configuration errors at development time
  * rather than discovering them at runtime when data fails to import.
@@ -11,18 +11,14 @@
  * NOTE: Uses mocked DummyJSON responses from tests/data/external/dummyjson-products.json
  * to ensure fast, deterministic tests that work offline without external API calls.
  *
- * Local reference: src/resolvers/mapping-resolver.ts, docs/assets/mapping-configuration-guide.md
+ * Local reference: src/assets/product-mapping.ts, src/external/dummyjson-client.ts,
+ * docs/assets/mapping-configuration-guide.md
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { FIELD_TO_ATTRIBUTE_MAP } from "../../src/resolvers/mapping-resolver";
+import { PRODUCT_FIELD_MAPPINGS } from "../../src/assets/product-mapping";
+import { toProductRecord } from "../../src/external/dummyjson-client";
 import dummyjsonProducts from "../data/external/dummyjson-products.json";
-
-/**
- * Use the source-of-truth mapping from mapping-resolver.ts
- * This ensures tests verify the actual configuration used in production.
- */
-const EXPECTED_FIELD_MAPPING = FIELD_TO_ATTRIBUTE_MAP;
 
 describe("DummyJSON Mapping Configuration", () => {
   beforeEach(() => {
@@ -45,8 +41,7 @@ describe("DummyJSON Mapping Configuration", () => {
   });
 
   describe("field existence validation", () => {
-    it("should verify all mapped fields exist in DummyJSON product data", async () => {
-      // Fetch returns mocked test data
+    it("should verify every mapped sourceField exists on the normalized product record", async () => {
       const response = await fetch(
         "https://dummyjson.com/products?limit=1&skip=0",
       );
@@ -58,43 +53,41 @@ describe("DummyJSON Mapping Configuration", () => {
       expect(data.products).toBeDefined();
       expect(data.products.length).toBeGreaterThan(0);
 
-      const sampleProduct = data.products[0];
+      // biome-ignore lint/suspicious/noExplicitAny: raw DummyJSON fixture shape
+      const normalized = toProductRecord(data.products[0] as any);
 
-      // Verify each field in the mapping exists in the actual data
-      const mappedFields = Object.keys(EXPECTED_FIELD_MAPPING);
       const missingFields: string[] = [];
-
-      for (const field of mappedFields) {
-        if (!(field in sampleProduct)) {
-          missingFields.push(field);
+      for (const fieldMapping of PRODUCT_FIELD_MAPPINGS) {
+        if (!(fieldMapping.sourceField in normalized)) {
+          missingFields.push(fieldMapping.sourceField);
         }
       }
 
       expect(
         missingFields,
-        `The following fields are in FIELD_TO_ATTRIBUTE_MAP but don't exist in DummyJSON products: ${missingFields.join(", ")}. ` +
-          `Available fields: ${Object.keys(sampleProduct).join(", ")}`,
+        `The following sourceFields are in PRODUCT_FIELD_MAPPINGS but missing from the normalized product record: ${missingFields.join(", ")}. ` +
+          `Available fields: ${Object.keys(normalized).join(", ")}`,
       ).toEqual([]);
     });
 
-    it("should verify the Key field (unique identifier) exists in data", async () => {
+    it("should verify the Key field (unique identifier) exists in normalized data", async () => {
       const response = await fetch(
         "https://dummyjson.com/products?limit=1&skip=0",
       );
       const data = (await response.json()) as {
         products: Array<Record<string, unknown>>;
       };
-      const sampleProduct = data.products[0];
+      // biome-ignore lint/suspicious/noExplicitAny: raw DummyJSON fixture shape
+      const normalized = toProductRecord(data.products[0] as any);
 
-      // Find which field is mapped to "Key" (the unique identifier)
-      const keyField = Object.entries(EXPECTED_FIELD_MAPPING).find(
-        ([_field, attribute]) => attribute === "Key",
-      )?.[0];
+      const keyField = PRODUCT_FIELD_MAPPINGS.find(
+        (fieldMapping) => fieldMapping.assetsField === "Key",
+      )?.sourceField;
 
       expect(keyField).toBeDefined();
       expect(
-        sampleProduct,
-        `The unique identifier field "${keyField}" must exist in DummyJSON products`,
+        normalized,
+        `The unique identifier field "${keyField}" must exist in the normalized product record`,
       ).toHaveProperty(keyField as string);
     });
 
@@ -106,14 +99,19 @@ describe("DummyJSON Mapping Configuration", () => {
         products: Array<Record<string, unknown>>;
       };
 
-      const mappedFields = Object.keys(EXPECTED_FIELD_MAPPING);
+      const normalizedProducts = data.products.map((product) =>
+        // biome-ignore lint/suspicious/noExplicitAny: raw DummyJSON fixture shape
+        toProductRecord(product as any),
+      );
       const fieldsWithNullValues = new Set<string>();
 
-      // Check multiple products to see if any required fields are sometimes null
-      for (const product of data.products) {
-        for (const field of mappedFields) {
-          if (product[field] === null || product[field] === undefined) {
-            fieldsWithNullValues.add(field);
+      for (const product of normalizedProducts) {
+        for (const fieldMapping of PRODUCT_FIELD_MAPPINGS) {
+          const value = (product as Record<string, unknown>)[
+            fieldMapping.sourceField
+          ];
+          if (value === null || value === undefined) {
+            fieldsWithNullValues.add(fieldMapping.sourceField);
           }
         }
       }
@@ -134,17 +132,19 @@ describe("DummyJSON Mapping Configuration", () => {
       const data = (await response.json()) as {
         products: Array<Record<string, unknown>>;
       };
-      const sampleProduct = data.products[0];
+      // biome-ignore lint/suspicious/noExplicitAny: raw DummyJSON fixture shape
+      const normalized = toProductRecord(data.products[0] as any) as Record<
+        string,
+        unknown
+      >;
 
-      // Verify types for known fields
-      expect(typeof sampleProduct.id).toBe("number");
-      expect(typeof sampleProduct.title).toBe("string");
-      expect(typeof sampleProduct.description).toBe("string");
-      expect(typeof sampleProduct.price).toBe("number");
-      expect(typeof sampleProduct.category).toBe("string");
-      expect(typeof sampleProduct.brand).toBe("string");
-      expect(typeof sampleProduct.rating).toBe("number");
-      expect(typeof sampleProduct.stock).toBe("number");
+      for (const fieldMapping of PRODUCT_FIELD_MAPPINGS) {
+        const expectedJsType =
+          fieldMapping.sourceType === "number" ? "number" : "string";
+        expect(typeof normalized[fieldMapping.sourceField]).toBe(
+          expectedJsType,
+        );
+      }
     });
 
     it("should verify the unique identifier field is suitable for use as external ID", async () => {
@@ -155,12 +155,16 @@ describe("DummyJSON Mapping Configuration", () => {
         products: Array<Record<string, unknown>>;
       };
 
-      // Find which field is mapped to "Key"
-      const keyField = Object.entries(EXPECTED_FIELD_MAPPING).find(
-        ([_field, attribute]) => attribute === "Key",
-      )?.[0] as string;
+      const keyField = PRODUCT_FIELD_MAPPINGS.find(
+        (fieldMapping) => fieldMapping.assetsField === "Key",
+      )?.sourceField as string;
 
-      const keyValues = data.products.map((p) => p[keyField]);
+      const keyValues = data.products.map(
+        (product) =>
+          (toProductRecord(product as never) as Record<string, unknown>)[
+            keyField
+          ],
+      );
 
       // Check all values are truthy
       const emptyValues = keyValues.filter((v) => !v);
@@ -183,7 +187,9 @@ describe("DummyJSON Mapping Configuration", () => {
       // This test documents what the Product object type schema should contain
       // The actual schema is created manually in Assets, but this serves as documentation
 
-      const expectedAttributes = Object.values(EXPECTED_FIELD_MAPPING);
+      const expectedAttributes = PRODUCT_FIELD_MAPPINGS.map(
+        (fieldMapping) => fieldMapping.assetsField,
+      );
 
       expect(expectedAttributes).toEqual([
         "Key", // Unique identifier (externalIdPart: true)

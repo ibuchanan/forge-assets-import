@@ -19,6 +19,15 @@ interface AssetsImportExtension {
   schemaId: string;
 }
 
+interface MappingRow {
+  sourceField: string;
+  assetsField: string;
+  type: string;
+  description: string;
+  required: boolean;
+  mapped: boolean;
+}
+
 function extractInvokeBody<T>(response: T | { body: T }): T {
   if (response !== null && typeof response === "object" && "body" in response) {
     return (response as { body: T }).body;
@@ -67,12 +76,44 @@ export const submitAssetMapping = async (
 export const App = () => {
   const [context, setContext] = useState<FullContext | undefined>(undefined);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [previewRows, setPreviewRows] = useState<MappingRow[] | undefined>(
+    undefined,
+  );
 
   useEffect(() => {
     if (!context) {
       void view.getContext().then(setContext);
     }
   }, [context]);
+
+  useEffect(() => {
+    const extension = context?.extension as AssetsImportExtension | undefined;
+    if (!extension || previewRows) {
+      return;
+    }
+
+    void invoke<{
+      success: boolean;
+      data?: MappingRow[];
+      error?: { detail?: string };
+    }>("buildMappingPreview", {
+      workspaceId: extension.workspaceId,
+      importId: extension.importId,
+    }).then((response) => {
+      const result = extractInvokeBody(response);
+      if (result.success && result.data) {
+        setPreviewRows(result.data);
+      } else {
+        showFlag({
+          id: "mapping-preview-error",
+          title: "Error",
+          type: "error",
+          description:
+            result.error?.detail || "Failed to load field mapping preview",
+        });
+      }
+    });
+  }, [context, previewRows]);
 
   const handleSubmit = async (): Promise<void> => {
     const extension = context?.extension as AssetsImportExtension | undefined;
@@ -137,78 +178,31 @@ export const App = () => {
     }
   };
 
-  if (!context) {
+  if (!context || !previewRows) {
     return <Spinner />;
   }
 
-  // Define the field mappings for display
-  const fieldMappings = [
-    {
-      dummyJson: "id",
-      assets: "Key",
-      type: "Integer",
-      description: "Unique product identifier (used as external ID)",
-    },
-    {
-      dummyJson: "title",
-      assets: "Name",
-      type: "Text",
-      description: "Product name/title",
-    },
-    {
-      dummyJson: "description",
-      assets: "Description",
-      type: "Textarea",
-      description: "Detailed product description",
-    },
-    {
-      dummyJson: "price",
-      assets: "Price",
-      type: "Float",
-      description: "Product price in USD",
-    },
-    {
-      dummyJson: "category",
-      assets: "Category",
-      type: "Text",
-      description: "Product category",
-    },
-    {
-      dummyJson: "brand",
-      assets: "Brand",
-      type: "Text",
-      description: "Product brand/manufacturer",
-    },
-    {
-      dummyJson: "rating",
-      assets: "Rating",
-      type: "Integer",
-      description: "Product rating (0-5)",
-    },
-    {
-      dummyJson: "stock",
-      assets: "Stock",
-      type: "Integer",
-      description: "Available stock quantity",
-    },
-  ];
-
   const tableHead = {
     cells: [
-      { key: "dummyJson", content: "DummyJSON Field" },
-      { key: "assets", content: "Assets Attribute" },
+      { key: "sourceField", content: "Source Field" },
+      { key: "assetsField", content: "Assets Attribute" },
       { key: "type", content: "Type" },
       { key: "description", content: "Description" },
     ],
   };
 
-  const tableRows = fieldMappings.map((mapping, index) => ({
+  const tableRows = previewRows.map((row, index) => ({
     key: `mapping-${index}`,
     cells: [
-      { key: "dummyJson", content: mapping.dummyJson },
-      { key: "assets", content: mapping.assets },
-      { key: "type", content: mapping.type },
-      { key: "description", content: mapping.description },
+      { key: "sourceField", content: row.sourceField },
+      { key: "assetsField", content: row.assetsField },
+      { key: "type", content: row.type },
+      {
+        key: "description",
+        content: row.mapped
+          ? row.description
+          : `${row.description} (not found in Assets)`,
+      },
     ],
   }));
 

@@ -27,7 +27,8 @@ vi.mock("@forge/events", () => ({
   },
 }));
 
-vi.mock("../../src/external/dummyjson-client", () => ({
+vi.mock("../../src/external/dummyjson-client", async (importOriginal) => ({
+  ...(await importOriginal()),
   fetchProductsBatch: fetchProductsBatchMock,
 }));
 

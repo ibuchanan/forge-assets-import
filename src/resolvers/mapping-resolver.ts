@@ -6,6 +6,11 @@
  */
 
 import { getSchemaAndMapping, submitMapping } from "../assets/import-client";
+import {
+  buildAttributesMapping,
+  buildMappingRows,
+  type MappingRow,
+} from "../assets/product-mapping";
 import { logStructured } from "../forge/logging";
 import type { ProblemDetails } from "../util/error";
 import {
@@ -75,28 +80,18 @@ export interface SubmitMappingRequest {
 }
 
 /**
- * Mapping between DummyJSON product fields and Assets attributes
+ * Build attribute mappings from the Product object type, using the structured
+ * field mapping definition in ../assets/product-mapping.ts. Optional fields
+ * (e.g. Brand) are silently omitted when unavailable; missing required
+ * attributes or external IDs produce a validation error.
  */
-export const FIELD_TO_ATTRIBUTE_MAP: Record<string, string> = {
-  id: "Key", // Product ID as unique identifier
-  title: "Name",
-  description: "Description",
-  price: "Price",
-  category: "Category",
-  brand: "Brand",
-  rating: "Rating",
-  stock: "Stock",
-};
-
-/**
- * Build attribute mappings using existing external IDs from Assets
- */
-function buildAttributesMappings(objectType: {
+function buildProductAttributesMappings(objectType: {
   externalId?: string;
   name: string;
   attributes?: Array<{
     externalId?: string;
     name: string;
+    type?: string;
   }>;
 }): ResultAsync<
   Array<{
@@ -107,77 +102,46 @@ function buildAttributesMappings(objectType: {
   }>,
   ProblemDetails
 > {
-  const attributes = objectType.attributes || [];
+  const { attributesMapping, report } = buildAttributesMapping(objectType);
 
-  if (attributes.length === 0) {
+  const blockingIssues = report.issues.filter(
+    (issue) => issue.type !== "type-warning",
+  );
+
+  if (blockingIssues.length > 0) {
+    logStructured(
+      "error",
+      "buildProductAttributesMappings",
+      "Product mapping validation failed",
+      {
+        objectTypeName: objectType.name,
+        issues: blockingIssues,
+      },
+    );
     return errAsync(
       problemDetails(
         416,
-        `Object type '${objectType.name}' has no attributes. Please add the following attributes: Name, Description, Price, Category, Brand, Rating, Stock.`,
+        blockingIssues.map((issue) => issue.message).join(" "),
       ),
     );
   }
 
-  const mappings = [];
-
-  for (const [dummyJsonField, assetAttributeName] of Object.entries(
-    FIELD_TO_ATTRIBUTE_MAP,
-  )) {
-    const attribute = attributes.find(
-      (attr) => attr.name === assetAttributeName,
+  for (const issue of report.issues) {
+    logStructured(
+      "warn",
+      "buildProductAttributesMappings",
+      "Product mapping type warning",
+      { objectTypeName: objectType.name, issue },
     );
-
-    if (!attribute) {
-      logStructured(
-        "error",
-        "buildAttributesMappings",
-        "Required attribute not found",
-        {
-          attributeName: assetAttributeName,
-          objectTypeName: objectType.name,
-        },
-      );
-      return errAsync(
-        problemDetails(
-          416,
-          `Required attribute '${assetAttributeName}' not found in object type. ` +
-            `Please add this attribute with the exact name '${assetAttributeName}' (case-sensitive). ` +
-            `Required attributes: Name, Description, Price, Category, Brand, Rating, Stock.`,
-        ),
-      );
-    }
-
-    // Use the external ID that Assets has already assigned
-    if (!attribute.externalId) {
-      logStructured(
-        "error",
-        "buildAttributesMappings",
-        "Attribute missing externalId",
-        {
-          attributeName: assetAttributeName,
-          objectTypeName: objectType.name,
-        },
-      );
-      return errAsync(
-        problemDetails(
-          416,
-          `Attribute '${assetAttributeName}' has no externalId. This should not happen - Assets should assign external IDs automatically.`,
-        ),
-      );
-    }
-
-    mappings.push({
-      attributeExternalId: attribute.externalId,
-      attributeName: assetAttributeName,
-      attributeLocators: [dummyJsonField],
-      externalIdPart: assetAttributeName === "Key", // Use product ID as the unique external identifier
-    });
   }
 
-  logStructured("info", "buildAttributesMappings", "Built attribute mappings", {
-    count: mappings.length,
-  });
-  return okAsync(mappings);
+  logStructured(
+    "info",
+    "buildProductAttributesMappings",
+    "Built attribute mappings",
+    { count: attributesMapping.length },
+  );
+  return okAsync(attributesMapping);
 }
 
 /**
@@ -284,7 +248,7 @@ export async function buildMappingBackend(
         return okAsync({ schemaAndMapping, productObjectType });
       })
       .andThen(({ schemaAndMapping, productObjectType }) => {
-        return buildAttributesMappings(productObjectType).map(
+        return buildProductAttributesMappings(productObjectType).map(
           (attributesMapping) => ({
             schemaAndMapping,
             productObjectType,
@@ -453,6 +417,56 @@ export async function buildMappingBackend(
  * This resolver handles the submission of the mapping to the Assets API
  * with proper logging for observability.
  */
+/**
+ * Build the field-mapping preview table for the frontend.
+ *
+ * Fetches the Product object type from Assets and renders it through
+ * buildMappingRows (../assets/product-mapping.ts), the single source of
+ * truth for Product field mappings, instead of the frontend hardcoding it.
+ */
+export async function buildMappingPreviewBackend(
+  req: BuildMappingRequest,
+): Promise<{ success: boolean; data?: MappingRow[]; error?: ProblemDetails }> {
+  const { workspaceId, importId } = req.payload;
+
+  if (!workspaceId || !importId) {
+    return {
+      success: false,
+      error: problemDetails(
+        400,
+        "Missing required parameters: workspaceId and importId",
+      ),
+    };
+  }
+
+  const result = await getSchemaAndMapping(workspaceId, importId).andThen(
+    (schemaAndMapping) => {
+      const objectTypes =
+        schemaAndMapping.schema?.objectSchema?.objectTypes || [];
+      const productObjectType = objectTypes.find((ot) => ot.name === "Product");
+
+      if (!productObjectType) {
+        const availableTypes =
+          objectTypes.map((ot) => ot.name).join(", ") || "none";
+        return errAsync(
+          problemDetails(
+            404,
+            `Object type "Product" not found in schema. Available object types: ${availableTypes}.`,
+          ),
+        );
+      }
+
+      return okAsync(buildMappingRows(productObjectType));
+    },
+  );
+
+  if (result.isErr()) {
+    return { success: false, error: result.error };
+  }
+
+  return { success: true, data: result.value };
+}
+
 export async function submitMappingBackend(
   req: SubmitMappingRequest,
 ): Promise<{ success: boolean; error?: ProblemDetails }> {

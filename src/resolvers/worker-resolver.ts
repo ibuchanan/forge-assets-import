@@ -4,7 +4,10 @@ import {
   submitData as submitDataToAssets,
   submitProgress,
 } from "../assets/import-client";
-import { fetchProductsBatch } from "../external/dummyjson-client";
+import {
+  fetchProductsBatch,
+  toProductRecord,
+} from "../external/dummyjson-client";
 import { logStructured } from "../forge/logging";
 import type { WorkItem } from "../types/queue";
 
@@ -123,13 +126,13 @@ export function isValidWorkItem(workItem: WorkItem): boolean {
 }
 
 /**
- * Submit a batch of raw product data to the Assets Import execution.
+ * Submit a batch of normalized product data to the Assets Import execution.
  *
  * Assets applies the mapping (configured during the frontend phase) server-side,
- * so the worker only needs to submit the raw data from the external source.
+ * matching attribute locators against these normalized field names.
  *
  * @param submitResultsUrl - The HATEOAS URL for submitting data (from Assets execution response)
- * @param products - Raw product data from DummyJSON
+ * @param products - Normalized product records (see toProductRecord)
  * @param clientGeneratedId - Unique identifier for this data submission
  * @param completed - Whether this is the final batch
  */
@@ -224,12 +227,15 @@ const handleWork = async (workItem: WorkItem): Promise<void> => {
       total,
     );
 
-    // Submit raw product data to Assets Import execution.
-    // Assets applies the mapping that was configured during the frontend phase.
+    // Submit normalized product data to Assets Import execution.
+    // Assets applies the mapping that was configured during the frontend phase,
+    // matching attribute locators against these normalized field names.
     // Use the HATEOAS URL fetched from Assets instead of storing it in queue.
     await submitData(
       submitResultsUrl,
-      products as unknown as Array<Record<string, unknown>>,
+      products.map(toProductRecord) as unknown as Array<
+        Record<string, unknown>
+      >,
       `batch-${skip}-${limit}`,
       isLastBatch,
     );

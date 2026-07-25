@@ -30,6 +30,39 @@ interface ProductsResponse {
 }
 
 /**
+ * Normalized Product record, matching the attribute locators declared in
+ * src/assets/product-mapping.ts.
+ */
+export interface ProductRecord {
+  key: number;
+  name: string;
+  description: string;
+  price: number;
+  category: string;
+  brand: string;
+  rating: number;
+  stock: number;
+}
+
+/**
+ * Normalize a raw DummyJSON product into the Product record shape expected
+ * by the Assets mapping's attribute locators (key, name, description, price,
+ * category, brand, rating, stock).
+ */
+export function toProductRecord(product: Product): ProductRecord {
+  return {
+    key: product.id,
+    name: product.title,
+    description: product.description,
+    price: product.price,
+    category: product.category,
+    brand: product.brand,
+    rating: product.rating,
+    stock: product.stock,
+  };
+}
+
+/**
  * Fetch a single batch of products
  * @param skip - Number of products to skip
  * @param limit - Number of products to fetch

@@ -30,7 +30,8 @@ vi.mock("@forge/events", () => ({
   },
 }));
 
-vi.mock("../../src/external/dummyjson-client", () => ({
+vi.mock("../../src/external/dummyjson-client", async (importOriginal) => ({
+  ...(await importOriginal()),
   fetchProductsBatch: vi.fn(),
 }));
 
@@ -101,7 +102,18 @@ describe("Mapping and Data Submission Contract", () => {
     expect(selector).toBe("products");
 
     (fetchProductsBatch as ReturnType<typeof vi.fn>).mockResolvedValue({
-      products: [{ id: 1, title: "Product 1" }],
+      products: [
+        {
+          id: 1,
+          title: "Product 1",
+          description: "A product",
+          price: 9.99,
+          category: "widgets",
+          brand: "Acme",
+          rating: 4.5,
+          stock: 10,
+        },
+      ],
       total: 1,
       skip: 0,
       limit: 30,
@@ -130,7 +142,18 @@ describe("Mapping and Data Submission Contract", () => {
     expect(submitCall?.[0]).toBe("/submit");
     expect(submittedBody).toMatchObject({
       data: {
-        products: [{ id: 1, title: "Product 1" }],
+        products: [
+          {
+            key: 1,
+            name: "Product 1",
+            description: "A product",
+            price: 9.99,
+            category: "widgets",
+            brand: "Acme",
+            rating: 4.5,
+            stock: 10,
+          },
+        ],
       },
       clientGeneratedId: "batch-0-30",
       completed: true,
