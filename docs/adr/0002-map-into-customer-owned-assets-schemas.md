@@ -1,0 +1,3 @@
+# Map into customer-owned Assets schemas
+
+The reference app should continue to demonstrate mapping DummyJSON product data into a customer-owned Assets schema rather than submitting a fully app-owned schema definition. This preserves the teaching value of the Assets Import module's extensible mapping UX for customers who need code to ingest external data into schemas they already created, even though it keeps schema-and-mapping introspection, exact attribute matching, and related permission questions in scope. The app should validate the expected object type, attributes, and external IDs strictly, but it should not create or mutate the customer's schema.
