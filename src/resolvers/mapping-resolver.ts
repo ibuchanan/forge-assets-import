@@ -9,9 +9,11 @@ import api, { route } from "@forge/api";
 import { logStructured } from "../forge/logging";
 import type { ProblemDetails } from "../util/error";
 import {
+  errAsync,
   extractOrCreateProblemDetails,
   ok,
   okAsync,
+  problemDetails,
   ResultAsync,
   StandardError,
   validateHttpResponse,
@@ -186,19 +188,11 @@ function buildAttributesMappings(objectType: {
   const attributes = objectType.attributes || [];
 
   if (attributes.length === 0) {
-    const errorResult = StandardError.getOrDefault(416).error(
-      `Object type '${objectType.name}' has no attributes. Please add the following attributes: Name, Description, Price, Category, Brand, Rating, Stock.`,
-    );
-    return ResultAsync.fromPromise(
-      Promise.reject(
-        errorResult.match(
-          () => {
-            throw new Error("Unexpected success");
-          },
-          (e) => e,
-        ),
+    return errAsync(
+      problemDetails(
+        416,
+        `Object type '${objectType.name}' has no attributes. Please add the following attributes: Name, Description, Price, Category, Brand, Rating, Stock.`,
       ),
-      (e) => e as ProblemDetails,
     );
   }
 
@@ -221,21 +215,13 @@ function buildAttributesMappings(objectType: {
           objectTypeName: objectType.name,
         },
       );
-      const errorResult = StandardError.getOrDefault(416).error(
-        `Required attribute '${assetAttributeName}' not found in object type. ` +
-          `Please add this attribute with the exact name '${assetAttributeName}' (case-sensitive). ` +
-          `Required attributes: Name, Description, Price, Category, Brand, Rating, Stock.`,
-      );
-      return ResultAsync.fromPromise(
-        Promise.reject(
-          errorResult.match(
-            () => {
-              throw new Error("Unexpected success");
-            },
-            (e) => e,
-          ),
+      return errAsync(
+        problemDetails(
+          416,
+          `Required attribute '${assetAttributeName}' not found in object type. ` +
+            `Please add this attribute with the exact name '${assetAttributeName}' (case-sensitive). ` +
+            `Required attributes: Name, Description, Price, Category, Brand, Rating, Stock.`,
         ),
-        (e) => e as ProblemDetails,
       );
     }
 
@@ -250,19 +236,11 @@ function buildAttributesMappings(objectType: {
           objectTypeName: objectType.name,
         },
       );
-      const errorResult = StandardError.getOrDefault(416).error(
-        `Attribute '${assetAttributeName}' has no externalId. This should not happen - Assets should assign external IDs automatically.`,
-      );
-      return ResultAsync.fromPromise(
-        Promise.reject(
-          errorResult.match(
-            () => {
-              throw new Error("Unexpected success");
-            },
-            (e) => e,
-          ),
+      return errAsync(
+        problemDetails(
+          416,
+          `Attribute '${assetAttributeName}' has no externalId. This should not happen - Assets should assign external IDs automatically.`,
         ),
-        (e) => e as ProblemDetails,
       );
     }
 
@@ -298,16 +276,11 @@ export async function buildMappingBackend(
         hasImportId: !!importId,
       },
     );
-    const errorResult = StandardError.getOrDefault(400).error(
-      "Missing required parameters: workspaceId and importId",
-    );
     return {
       success: false,
-      error: errorResult.match(
-        () => {
-          throw new Error("Unexpected success");
-        },
-        (e) => e,
+      error: problemDetails(
+        400,
+        "Missing required parameters: workspaceId and importId",
       ),
     };
   }
@@ -336,19 +309,11 @@ export async function buildMappingBackend(
             },
           );
 
-          const errorResult = StandardError.getOrDefault(404).error(
-            `Object type "Product" not found in schema. Available object types: ${availableTypes}. Please ensure the schema contains an object type named "Product" (case-sensitive).`,
-          );
-          return ResultAsync.fromPromise(
-            Promise.reject(
-              errorResult.match(
-                () => {
-                  throw new Error("Unexpected success");
-                },
-                (e) => e,
-              ),
+          return errAsync(
+            problemDetails(
+              404,
+              `Object type "Product" not found in schema. Available object types: ${availableTypes}. Please ensure the schema contains an object type named "Product" (case-sensitive).`,
             ),
-            (e) => e as ProblemDetails,
           );
         }
 
@@ -550,16 +515,11 @@ export async function buildMappingBackend(
         errorMessage: error instanceof Error ? error.message : String(error),
       },
     );
-    const errorResult = StandardError.getOrDefault(500).error(
-      `Unexpected error: ${error instanceof Error ? error.message : String(error)}`,
-    );
     return {
       success: false,
-      error: errorResult.match(
-        () => {
-          throw new Error("Unexpected success");
-        },
-        (e) => e,
+      error: problemDetails(
+        500,
+        `Unexpected error: ${error instanceof Error ? error.message : String(error)}`,
       ),
     };
   }
@@ -587,16 +547,11 @@ export async function submitMappingBackend(
         hasMapping: !!mapping,
       },
     );
-    const errorResult = StandardError.getOrDefault(400).error(
-      "Missing required parameters: workspaceId, importId, and mapping",
-    );
     return {
       success: false,
-      error: errorResult.match(
-        () => {
-          throw new Error("Unexpected success");
-        },
-        (e) => e,
+      error: problemDetails(
+        400,
+        "Missing required parameters: workspaceId, importId, and mapping",
       ),
     };
   }
@@ -770,16 +725,11 @@ export async function submitMappingBackend(
         errorMessage: error instanceof Error ? error.message : String(error),
       },
     );
-    const errorResult = StandardError.getOrDefault(500).error(
-      `Unexpected error: ${error instanceof Error ? error.message : String(error)}`,
-    );
     return {
       success: false,
-      error: errorResult.match(
-        () => {
-          throw new Error("Unexpected success");
-        },
-        (e) => e,
+      error: problemDetails(
+        500,
+        `Unexpected error: ${error instanceof Error ? error.message : String(error)}`,
       ),
     };
   }

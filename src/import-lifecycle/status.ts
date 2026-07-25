@@ -15,9 +15,9 @@ import { logStructured } from "../forge/logging";
 import {
   err,
   ok,
+  problemDetails,
   type ProblemDetails,
   type Result,
-  StandardError,
   validateHttpResponse,
 } from "../util/error";
 
@@ -88,8 +88,11 @@ async function fetchConfigurationStatus(
   } catch (error) {
     // Handle network errors, timeouts, etc.
     const errorMessage = error instanceof Error ? error.message : String(error);
-    return StandardError.getOrDefault(500).error(
-      `Failed to fetch configuration status: ${errorMessage}`,
+    return err(
+      problemDetails(
+        500,
+        `Failed to fetch configuration status: ${errorMessage}`,
+      ),
     );
   }
 }
