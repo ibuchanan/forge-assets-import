@@ -1,15 +1,16 @@
 import {
   err,
   errAsync,
-  isProblemDetails,
   ok,
   okAsync,
   type ProblemDetails,
+  problemDetails,
   type Result,
   ResultAsync,
   ShellExitCodes,
   StandardError,
-  toErrorMessage,
+  toProblemDetails,
+  validateHttpResponse,
 } from "@forge-ahead/errors";
 
 // Re-export so consumers only need to import from this module
@@ -19,28 +20,21 @@ export {
   ok,
   okAsync,
   type ProblemDetails,
+  problemDetails,
   type Result,
   ResultAsync,
   ShellExitCodes,
   StandardError,
+  toProblemDetails,
+  validateHttpResponse,
 };
 
 /**
- * Build a ProblemDetails object for a status/message pair.
+ * Extract ProblemDetails from a caught error, or build one from it.
  *
- * StandardError.error() always returns Err (its Ok type is `never`), so
- * unwrapping via _unsafeUnwrapErr() here is safe and avoids a throwaway
- * Result.match() at every call site that just wants the ProblemDetails value.
- */
-export function problemDetails(
-  status: number,
-  message: string,
-): ProblemDetails {
-  return StandardError.getOrDefault(status).error(message)._unsafeUnwrapErr();
-}
-
-/**
- * Extract ProblemDetails from a caught error, or build one from it
+ * Thin alias over @forge-ahead/errors' toProblemDetails, defaulting to a
+ * 502 (network/upstream failure) since this project's call sites use it
+ * exclusively for errors thrown while making an outbound HTTP request.
  *
  * @param error - The caught error (unknown type)
  * @param context - Context string for error message (e.g., "fetching schema")
@@ -50,61 +44,7 @@ export function extractOrCreateProblemDetails(
   error: unknown,
   context: string,
 ): ProblemDetails {
-  if (isProblemDetails(error)) {
-    return error;
-  }
-  return problemDetails(
-    502,
-    `Network error while ${context}: ${toErrorMessage(error)}`,
-  );
-}
-
-/**
- * Minimal shape shared by the Web API Response and Forge API Response types,
- * covering the methods validateHttpResponse needs.
- */
-interface HttpLikeResponse {
-  ok: boolean;
-  status: number;
-  statusText: string;
-  text(): Promise<string>;
-  json(): Promise<unknown>;
-}
-
-/**
- * Validate HTTP response and handle errors using Results (never throw)
- *
- * Checks if response is ok, and if not, reads the error text and returns
- * an error Result with appropriate status code. This is a generic utility
- * for any HTTP response validation in Result-based code.
- *
- * Accepts both Web API Response and Forge API Response types, which have
- * compatible interfaces for the methods we use (ok, status, statusText, text()).
- *
- * @param response - HTTP response object (Web API or Forge API Response)
- * @param context - Context string for error message (e.g., "fetch schema")
- * @returns ResultAsync with ok(response) if successful, or err(ProblemDetails) if response is not ok
- */
-export function validateHttpResponse(
-  response: HttpLikeResponse,
-  context: string,
-): ResultAsync<HttpLikeResponse, ProblemDetails> {
-  if (response.ok) {
-    return okAsync(response);
-  }
-
-  return ResultAsync.fromPromise(
-    response.text(),
-    (error: unknown): ProblemDetails =>
-      extractOrCreateProblemDetails(error, `validating ${context}`),
-  ).andThen((errorText) =>
-    errAsync(
-      problemDetails(
-        response.status,
-        `Failed to ${context}: ${response.status} ${response.statusText} - ${errorText}`,
-      ),
-    ),
-  );
+  return toProblemDetails(error, 502, context);
 }
 
 // Create the standard errors needed for this project
