@@ -11,6 +11,29 @@ import {
   validateProductMapping,
 } from "../../src/assets/product-mapping";
 
+describe("PRODUCT_FIELD_MAPPINGS", () => {
+  it("expects the same Assets attribute types as the real Product object schema", () => {
+    // Known-good values from tests/data/payload/mapping-configuration.json,
+    // a captured real Assets schema response for the Product object type.
+    const expectedAssetsTypeBySourceField: Record<string, string> = {
+      key: "text",
+      name: "text",
+      description: "text",
+      price: "double",
+      category: "text",
+      brand: "text",
+      rating: "double",
+      stock: "integer",
+    };
+
+    for (const fieldMapping of PRODUCT_FIELD_MAPPINGS) {
+      expect(fieldMapping.expectedAssetsType).toBe(
+        expectedAssetsTypeBySourceField[fieldMapping.sourceField],
+      );
+    }
+  });
+});
+
 describe("buildMappingRows", () => {
   it("returns one row per field mapping, copying its display fields and marking it mapped when the attribute exists", () => {
     const objectType = {
@@ -78,6 +101,31 @@ describe("validateProductMapping", () => {
     expect(report.issues).not.toContainEqual(
       expect.objectContaining({ field: "Brand" }),
     );
+  });
+
+  it("reports every missing required attribute together in one report, rather than stopping at the first", () => {
+    const objectType = {
+      name: "Product",
+      attributes: [{ name: "Key", externalId: "attr-Key" }],
+    };
+
+    const report = validateProductMapping(objectType);
+
+    const missingFields = report.issues
+      .filter((issue) => issue.type === "missing-required-attribute")
+      .map((issue) => issue.field);
+
+    expect(missingFields).toEqual(
+      expect.arrayContaining([
+        "Name",
+        "Description",
+        "Price",
+        "Category",
+        "Rating",
+        "Stock",
+      ]),
+    );
+    expect(missingFields).not.toContain("Brand");
   });
 
   it("reports a missing-external-id issue when a matched attribute has no externalId", () => {
