@@ -42,7 +42,7 @@
   },
   "devDependencies": {
     "@ast-grep/cli": "^0.44",
-    "@biomejs/biome": "^2.5",
+    "@biomejs/biome": "2.5.5",
     "@forge-ahead/atlassian-api-types": "github:ibuchanan/forge-ahead-atlassian-api-types",
     "@forge-ahead/prelint": "github:ibuchanan/tool-forge-prelint-ast-grep",
     "@size-limit/file": "^12.1",
