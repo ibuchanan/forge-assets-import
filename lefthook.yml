@@ -1,13 +1,8 @@
-# Local Lefthook wiring for this standalone repository.
-#
-# `npm run check` delegates to `lefthook run pre-push --force`, and
-# `npm run lint` delegates to `lefthook run lint` — this file is the single
-# source of truth for which checks make up each pipeline, so the two don't
-# drift out of sync with each other.
-#
-# Setup: `npm install` runs the `prepare` script (`lefthook install`), which
-# wires these hooks into `.git/hooks/`. See README for prerequisites
-# (Forge CLI login for `lint:forge`, gitleaks for the pre-commit secret scan).
+colors: false
+output:
+  - meta
+  - summary
+  - failure
 
 lint:
   parallel: true
@@ -27,10 +22,8 @@ pre-commit:
     gitleaks:
       run: gitleaks protect --staged --no-banner --redact
     format:
-      glob: "*.{js,jsx,ts,tsx,json,md,yml,yaml}"
       run: npm run format:check
     lint:
-      glob: "*.{js,jsx,ts,tsx}"
       run: npm run lint:check
 
 pre-push:
