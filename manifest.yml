@@ -50,9 +50,6 @@ permissions:
     - import:import-configuration:cmdb
     - read:cmdb-object:jira
     - write:cmdb-object:jira
-    - read:cmdb-schema:jira
-    - read:cmdb-type:jira
-    - read:cmdb-attribute:jira
   external:
     fetch:
       backend:

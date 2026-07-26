@@ -53,9 +53,32 @@ The mapping configuration uses two Atlassian-proprietary query concepts — not 
 
 **`selector`** on each `objectTypeMapping` is a top-level key name that tells the Assets Import engine which field in your submitted data payload holds the array of records to process. This project submits `{ data: { products: [...] } }` and sets `selector: "products"`, so Assets iterates over `data.products`.
 
-**`attributeLocators`** on each `attributeMapping` is an array of field name strings that extract a value from each individual record. This project uses flat keys (`"id"`, `"title"`, `"price"`, etc.). Whether the Insight JSON selector supports deeper path syntax (e.g. dot-notation for nested fields) is not documented by Atlassian; treat it as a flat key lookup until proven otherwise.
+**`attributeLocators`** on each `attributeMapping` is an array of field name strings that extract a value from each individual record. This project normalizes each DummyJSON product into flat keys (`"key"`, `"name"`, `"price"`, etc. — see the table below) before mapping, so `attributeLocators` is always a single-element array naming one of those normalized fields. Whether the Insight JSON selector supports deeper path syntax (e.g. dot-notation for nested fields) is not documented by Atlassian; treat it as a flat key lookup until proven otherwise.
 
 See `tests/data/schema/assets_mapping_2023_10_19.schema.json` for the formal schema and `tests/data/payload/mapping-configuration.json` for a concrete example.
+
+## Product schema
+
+Before installing this app, create a `Product` object type in your Assets schema with the attributes below. The app validates this schema at configuration time and reports any missing required attribute or external ID; it never creates or mutates your schema.
+
+Each attribute needs an **external ID** set (Assets attribute settings → External ID) — the app matches attributes by name and uses the external ID to build the mapping request. `Key` must be marked as (part of) the object's label/identity attribute, since it doubles as the import's external ID part.
+
+`Brand` is optional: omit it (or leave its external ID unset) and the app will map every other attribute without blocking the import; DummyJSON records without a brand value are imported without one too.
+
+<!-- PRODUCT_SCHEMA_TABLE:START -->
+| Assets attribute | Type | Required | Description |
+| --- | --- | --- | --- |
+| Key | text | Yes | Unique product identifier (used as external ID) |
+| Name | text | Yes | Product name/title |
+| Description | text | Yes | Detailed product description |
+| Price | double | Yes | Product price in USD |
+| Category | text | Yes | Product category |
+| Brand | text | No | Product brand/manufacturer |
+| Rating | double | Yes | Product rating (0-5) |
+| Stock | integer | Yes | Available stock quantity |
+<!-- PRODUCT_SCHEMA_TABLE:END -->
+
+This table is generated from `src/assets/product-mapping.ts` (`PRODUCT_FIELD_MAPPINGS`) and checked against it by `tests/docs/readme-product-schema.test.ts`; if you change the mapping, regenerate the table with the same source before committing.
 
 ## Learn more
 
