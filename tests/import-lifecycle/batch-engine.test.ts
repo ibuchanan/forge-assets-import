@@ -1,25 +1,76 @@
 /**
- * Tests for worker-resolver pure functions (sans-I/O)
+ * Tests for the batch engine's pure business logic (sans-I/O)
  *
- * These tests validate the business logic extracted from the worker resolver.
- * No mocking required - all pure functions!
+ * These functions are source-agnostic: they know nothing about DummyJSON
+ * or any other BatchSourceAdapter. No mocking required.
  *
- * @see {@link https://developer.atlassian.com/platform/forge/runtime-reference/forge-resolver/|Forge Resolver}
- * @see {@link https://developer.atlassian.com/platform/forge/use-a-long-running-function/|Long-running Functions}
- * @see {@link https://developer.atlassian.com/cloud/assets/imports-rest-api-guide/|Assets Imports REST API Guide}
- *
- * Local reference: src/resolvers/worker-resolver.ts, docs/forge/queue-events-with-async-events-api-to-import-assets.md
+ * Local reference: src/import-lifecycle/batch-engine.ts
  */
 
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const requestJiraMock = vi.hoisted(() => vi.fn());
+
+vi.mock("@forge/api", () => ({
+  default: {
+    asApp: () => ({
+      requestJira: requestJiraMock,
+    }),
+  },
+  assumeTrustedRoute: (url: string) => url,
+}));
+
+const saveLatestOutcomeMock = vi.hoisted(() => vi.fn());
+
+vi.mock("../../src/import-lifecycle/run-state", () => ({
+  saveLatestOutcome: saveLatestOutcomeMock,
+}));
+
 import {
   calculateBatchProgress,
   createNextWorkItem,
   isValidWorkItem,
+  processWorkItem,
   shouldRetryError,
-} from "../../src/resolvers/worker-resolver";
+} from "../../src/import-lifecycle/batch-engine";
 
-describe("worker-resolver - pure business logic (no mocking needed)", () => {
+const baseWorkItem = {
+  importConfigurationId: "import-123",
+  workspaceId: "workspace-456",
+  executionId: "execution-789",
+  submitResultsUrl: "https://api.atlassian.com/imports/data",
+  submitProgressUrl: "https://api.atlassian.com/imports/progress",
+  getExecutionStatusUrl: "https://api.atlassian.com/imports/status",
+  cancelUrl: "https://api.atlassian.com/imports/cancel",
+};
+
+const makeOkResponse = () => ({
+  ok: true,
+  status: 200,
+  statusText: "OK",
+  text: async () => "",
+  json: async () => ({}),
+});
+
+function makeAdapter(
+  overrides: Partial<{
+    fetchBatch: ReturnType<typeof vi.fn>;
+    transform: ReturnType<typeof vi.fn>;
+    shouldRetrySourceError: (error: Error) => boolean;
+  }> = {},
+) {
+  return {
+    fetchBatch: vi
+      .fn()
+      .mockResolvedValue({ records: [{ id: 1 }, { id: 2 }], total: 60 }),
+    transform: vi.fn((records: Array<{ id: number }>) =>
+      records.map((r) => ({ mapped: r.id })),
+    ),
+    ...overrides,
+  };
+}
+
+describe("batch-engine - pure business logic (no mocking needed)", () => {
   describe("calculateBatchProgress", () => {
     it("should calculate nextSkip correctly", () => {
       const result = calculateBatchProgress(0, 30, 100);
@@ -233,7 +284,6 @@ describe("worker-resolver - pure business logic (no mocking needed)", () => {
         skip: 0,
         limit: 30,
         total: 100,
-        // HATEOAS links required for valid work item
         submitResultsUrl: "https://api.atlassian.com/.../data",
         submitProgressUrl: "https://api.atlassian.com/.../progress",
         getExecutionStatusUrl: "https://api.atlassian.com/.../status",
@@ -294,5 +344,163 @@ describe("worker-resolver - pure business logic (no mocking needed)", () => {
 
       expect(isValidWorkItem(workItem)).toBe(false);
     });
+  });
+});
+
+describe("processWorkItem - source-agnostic batch orchestration", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    requestJiraMock.mockResolvedValue(makeOkResponse());
+    saveLatestOutcomeMock.mockResolvedValue(undefined);
+  });
+
+  it("reports invalid when the work item is missing required fields", async () => {
+    const adapter = makeAdapter();
+    const invalidWorkItem = {
+      ...baseWorkItem,
+      executionId: "",
+      skip: 0,
+      limit: 25,
+      total: 60,
+    };
+
+    const result = await processWorkItem(invalidWorkItem, adapter);
+
+    expect(result).toEqual({
+      type: "invalid",
+      missingFields: ["executionId"],
+    });
+    expect(adapter.fetchBatch).not.toHaveBeenCalled();
+  });
+
+  it("fetches and transforms the batch via the adapter, then enqueues the next work item", async () => {
+    const adapter = makeAdapter();
+
+    const result = await processWorkItem(
+      { ...baseWorkItem, skip: 0, limit: 25, total: 60 },
+      adapter,
+    );
+
+    expect(adapter.fetchBatch).toHaveBeenCalledWith({ skip: 0, limit: 25 });
+    expect(adapter.transform).toHaveBeenCalledWith([{ id: 1 }, { id: 2 }]);
+
+    const [submitUrl, submitOptions] = requestJiraMock.mock.calls[0];
+    const submitPayload = JSON.parse(submitOptions.body as string);
+    expect(submitUrl).toBe("/imports/data");
+    expect(submitPayload.data.products).toEqual([{ mapped: 1 }, { mapped: 2 }]);
+    expect(submitPayload.completed).toBe(false);
+
+    expect(result).toEqual({
+      type: "enqueue-next",
+      nextWorkItem: expect.objectContaining({ skip: 25, total: 60 }),
+    });
+  });
+
+  it("reports progress for non-final batches", async () => {
+    const adapter = makeAdapter();
+
+    await processWorkItem(
+      { ...baseWorkItem, skip: 0, limit: 25, total: 60 },
+      adapter,
+    );
+
+    const progressCall = requestJiraMock.mock.calls.find(
+      ([, options]) => options?.method === "PUT",
+    );
+    expect(progressCall).toBeDefined();
+    const [progressUrl, progressOptions] = progressCall as [
+      string,
+      { body: string },
+    ];
+    expect(progressUrl).toBe("/imports/progress");
+    expect(JSON.parse(progressOptions.body)).toEqual({
+      objects: { total: 60, processed: 2 },
+    });
+  });
+
+  it("marks the final batch as completed, records submission-complete, and does not enqueue or report progress", async () => {
+    const adapter = makeAdapter();
+
+    const result = await processWorkItem(
+      { ...baseWorkItem, skip: 30, limit: 25, total: 32 },
+      adapter,
+    );
+
+    const [, submitOptions] = requestJiraMock.mock.calls[0];
+    const submitPayload = JSON.parse(submitOptions.body as string);
+    expect(submitPayload.completed).toBe(true);
+
+    const progressCall = requestJiraMock.mock.calls.find(
+      ([, options]) => options?.method === "PUT",
+    );
+    expect(progressCall).toBeUndefined();
+
+    expect(saveLatestOutcomeMock).toHaveBeenCalledWith(
+      "import-123",
+      expect.objectContaining({
+        outcome: "submission-complete",
+        recordedAt: expect.any(String),
+      }),
+    );
+    expect(result).toEqual({ type: "completed" });
+  });
+
+  it("throws when Assets submission fails with a retriable error", async () => {
+    const adapter = makeAdapter();
+    requestJiraMock.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      statusText: "Internal Server Error",
+      text: async () => "server error",
+      json: async () => ({}),
+    });
+
+    await expect(
+      processWorkItem(
+        { ...baseWorkItem, skip: 0, limit: 25, total: 60 },
+        adapter,
+      ),
+    ).rejects.toThrow();
+  });
+
+  it("returns non-retriable-error without throwing when Assets submission fails with a 4xx error", async () => {
+    const adapter = makeAdapter();
+    requestJiraMock.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      statusText: "Not Found",
+      text: async () => "execution not found",
+      json: async () => ({}),
+    });
+
+    const result = await processWorkItem(
+      { ...baseWorkItem, skip: 0, limit: 25, total: 60 },
+      adapter,
+    );
+
+    expect(result.type).toBe("non-retriable-error");
+    if (result.type === "non-retriable-error") {
+      expect(result.error).toBeInstanceOf(Error);
+    }
+  });
+
+  it("uses the adapter's shouldRetrySourceError override instead of the default policy", async () => {
+    const adapter = makeAdapter({
+      shouldRetrySourceError: () => false,
+    });
+    requestJiraMock.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      statusText: "Internal Server Error",
+      text: async () => "server error",
+      json: async () => ({}),
+    });
+
+    const result = await processWorkItem(
+      { ...baseWorkItem, skip: 0, limit: 25, total: 60 },
+      adapter,
+    );
+
+    expect(result.type).toBe("non-retriable-error");
   });
 });

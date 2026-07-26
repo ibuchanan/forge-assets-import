@@ -5,7 +5,7 @@
 
 import type { AsyncEvent } from "@forge/events";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fetchProductsBatch } from "../../src/external/dummyjson-client";
+import { dummyJsonProductAdapter } from "../../src/external/dummyjson-client";
 import type { BuildMappingRequest } from "../../src/resolvers/mapping-resolver";
 import { buildMappingBackend } from "../../src/resolvers/mapping-resolver";
 import { handler as workerHandler } from "../../src/resolvers/worker-resolver";
@@ -30,10 +30,16 @@ vi.mock("@forge/events", () => ({
   },
 }));
 
-vi.mock("../../src/external/dummyjson-client", async (importOriginal) => ({
-  ...(await importOriginal()),
-  fetchProductsBatch: vi.fn(),
-}));
+vi.mock("../../src/external/dummyjson-client", async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, unknown>;
+  return {
+    ...actual,
+    dummyJsonProductAdapter: {
+      ...(actual.dummyJsonProductAdapter as object),
+      fetchBatch: vi.fn(),
+    },
+  };
+});
 
 vi.mock("../../src/import-lifecycle/run-state", () => ({
   saveLatestOutcome: vi.fn().mockResolvedValue(undefined),
@@ -105,8 +111,10 @@ describe("Mapping and Data Submission Contract", () => {
     const selector = mappingPayload.mapping.objectTypeMappings[0].selector;
     expect(selector).toBe("products");
 
-    (fetchProductsBatch as ReturnType<typeof vi.fn>).mockResolvedValue({
-      products: [
+    (
+      dummyJsonProductAdapter.fetchBatch as ReturnType<typeof vi.fn>
+    ).mockResolvedValue({
+      records: [
         {
           id: 1,
           title: "Product 1",
@@ -119,8 +127,6 @@ describe("Mapping and Data Submission Contract", () => {
         },
       ],
       total: 1,
-      skip: 0,
-      limit: 30,
     });
 
     await workerHandler({
@@ -202,11 +208,11 @@ describe("Mapping and Data Submission Contract", () => {
   });
 
   it("skips progress updates after the final batch is submitted", async () => {
-    (fetchProductsBatch as ReturnType<typeof vi.fn>).mockResolvedValue({
-      products: [{ id: 1 }],
+    (
+      dummyJsonProductAdapter.fetchBatch as ReturnType<typeof vi.fn>
+    ).mockResolvedValue({
+      records: [{ id: 1 }],
       total: 1,
-      skip: 0,
-      limit: 30,
     });
 
     requestJiraMock.mockResolvedValue(buildOkResponse({}));

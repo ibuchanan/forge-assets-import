@@ -1,6 +1,6 @@
 import type { AsyncEvent, PushResult } from "@forge/events";
 import { Queue } from "@forge/events";
-import { fetchProductsBatch } from "../external/dummyjson-client";
+import { dummyJsonProductAdapter } from "../external/dummyjson-client";
 import { logStructured } from "../forge/logging";
 import type { WorkItem } from "../types/queue";
 import { workerQueue } from "./worker-resolver";
@@ -43,7 +43,7 @@ const handleControllerEvent = async (eventBody: WorkItem): Promise<void> => {
 
   try {
     // Fetch the first batch to get the total count
-    const batch = await fetchProductsBatch(skip, limit);
+    const batch = await dummyJsonProductAdapter.fetchBatch({ skip, limit });
     const { total } = batch;
 
     // Push the first work item to worker queue.

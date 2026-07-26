@@ -10,11 +10,13 @@
 import type { AsyncEvent } from "@forge/events";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const fetchProductsBatchMock = vi.hoisted(() => vi.fn());
+const fetchBatchMock = vi.hoisted(() => vi.fn());
 const workerQueuePushMock = vi.hoisted(() => vi.fn());
 
 vi.mock("../../src/external/dummyjson-client", () => ({
-  fetchProductsBatch: fetchProductsBatchMock,
+  dummyJsonProductAdapter: {
+    fetchBatch: fetchBatchMock,
+  },
 }));
 
 vi.mock("../../src/resolvers/worker-resolver", () => ({
@@ -41,17 +43,15 @@ describe("Controller Queue - Behavior Tests", () => {
   });
 
   it("fetches the first batch with the configured batch size and enqueues a work item", async () => {
-    fetchProductsBatchMock.mockResolvedValue({
-      products: [],
+    fetchBatchMock.mockResolvedValue({
+      records: [],
       total: 120,
-      skip: 0,
-      limit: 30,
     });
     workerQueuePushMock.mockResolvedValue({ jobId: "job-123" });
 
     await handler({ body: baseEventBody } as AsyncEvent);
 
-    expect(fetchProductsBatchMock).toHaveBeenCalledWith(0, 30);
+    expect(fetchBatchMock).toHaveBeenCalledWith({ skip: 0, limit: 30 });
     expect(workerQueuePushMock).toHaveBeenCalledWith({
       body: expect.objectContaining({
         skip: 0,
@@ -63,17 +63,15 @@ describe("Controller Queue - Behavior Tests", () => {
   });
 
   it("honors skip in the event body when fetching the initial batch", async () => {
-    fetchProductsBatchMock.mockResolvedValue({
-      products: [],
+    fetchBatchMock.mockResolvedValue({
+      records: [],
       total: 60,
-      skip: 60,
-      limit: 30,
     });
     workerQueuePushMock.mockResolvedValue({ jobId: "job-456" });
 
     await handler({ body: { ...baseEventBody, skip: 60 } } as AsyncEvent);
 
-    expect(fetchProductsBatchMock).toHaveBeenCalledWith(60, 30);
+    expect(fetchBatchMock).toHaveBeenCalledWith({ skip: 60, limit: 30 });
   });
 
   it("does not enqueue work when required identifiers are missing", async () => {
@@ -81,7 +79,7 @@ describe("Controller Queue - Behavior Tests", () => {
       body: { ...baseEventBody, executionId: "" },
     } as AsyncEvent);
 
-    expect(fetchProductsBatchMock).not.toHaveBeenCalled();
+    expect(fetchBatchMock).not.toHaveBeenCalled();
     expect(workerQueuePushMock).not.toHaveBeenCalled();
   });
 });

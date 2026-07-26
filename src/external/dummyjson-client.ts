@@ -92,3 +92,25 @@ export async function fetchProductsBatch(
 
   return (await response.json()) as ProductsResponse;
 }
+
+/**
+ * BatchSourceAdapter implementation for DummyJSON products, so the batch
+ * engine and its queue consumers never need to know DummyJSON's shape.
+ */
+export const dummyJsonProductAdapter = {
+  async fetchBatch({
+    skip,
+    limit,
+  }: {
+    skip: number;
+    limit: number;
+  }): Promise<{ records: Product[]; total: number }> {
+    const { products, total } = await fetchProductsBatch(skip, limit);
+    return { records: products, total };
+  },
+  transform(records: Product[]): Array<Record<string, unknown>> {
+    return records.map(toProductRecord) as unknown as Array<
+      Record<string, unknown>
+    >;
+  },
+};
