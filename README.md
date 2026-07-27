@@ -15,14 +15,14 @@ complete with configuration, field mapping, progress tracking, and lifecycle con
 
 This app demonstrates the full import integration pattern:
 
-* A **configuration UI** rendered inside the Assets "Configure App" modal,
+- A **configuration UI** rendered inside the Assets "Configure App" modal,
   showing the field mapping between the external source and Assets attributes.
-* **Import lifecycle hooks** (`startImport`, `stopImport`, `importStatus`, `onDeleteImport`)
+- **Import lifecycle hooks** (`startImport`, `stopImport`, `importStatus`, `onDeleteImport`)
   wired to Forge functions via the `jiraServiceManagement:assetsImportType` module.
-* A **controller queue** that creates an import execution via the Assets API,
+- A **controller queue** that creates an import execution via the Assets API,
   fetches the first data batch to determine the total record count,
   and pushes the initial work item to the worker queue.
-* A **worker queue** that fetches data in batches from the external source,
+- A **worker queue** that fetches data in batches from the external source,
   submits each batch to the Assets import execution endpoint,
   reports progress, and self-chains until all records are ingested.
 
@@ -36,12 +36,14 @@ See the
 [Forge Async Events API diagram](https://dac-static.atlassian.com/platform/forge/images/assets-import-async-events-api-example.png?_v=1.5800.340)
 for a visual overview of the controller/worker queue pattern.
 
+<iframe width="640" height="362" src="https://www.loom.com/embed/56ee0a6031e54025b206cfc7ba79882e" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen></iframe>
+
 ## What kind of project this is
 
 This is a **maintained reference app**, not a production integration and not
 an archival sample. The DummyJSON product scenario is intentionally small
 and artificial — it exists to demonstrate the Assets Import lifecycle end to
-end, not to model a realistic customer integration. What *is* meant to be
+end, not to model a realistic customer integration. What _is_ meant to be
 taken seriously is the quality bar behind it; see
 [Development](#development) below and
 [`docs/adr/0001-maintain-reference-app-quality.md`](docs/adr/0001-maintain-reference-app-quality.md)
@@ -66,16 +68,18 @@ Each attribute needs an **external ID** set (Assets attribute settings → Exter
 `Brand` is optional: omit it (or leave its external ID unset) and the app will map every other attribute without blocking the import; DummyJSON records without a brand value are imported without one too.
 
 <!-- PRODUCT_SCHEMA_TABLE:START -->
-| Assets attribute | Type | Required | Description |
-| --- | --- | --- | --- |
-| Key | text | Yes | Unique product identifier (used as external ID) |
-| Name | text | Yes | Product name/title |
-| Description | text | Yes | Detailed product description |
-| Price | double | Yes | Product price in USD |
-| Category | text | Yes | Product category |
-| Brand | text | No | Product brand/manufacturer |
-| Rating | double | Yes | Product rating (0-5) |
-| Stock | integer | Yes | Available stock quantity |
+
+| Assets attribute | Type    | Required | Description                                     |
+| ---------------- | ------- | -------- | ----------------------------------------------- |
+| Key              | text    | Yes      | Unique product identifier (used as external ID) |
+| Name             | text    | Yes      | Product name/title                              |
+| Description      | text    | Yes      | Detailed product description                    |
+| Price            | double  | Yes      | Product price in USD                            |
+| Category         | text    | Yes      | Product category                                |
+| Brand            | text    | No       | Product brand/manufacturer                      |
+| Rating           | double  | Yes      | Product rating (0-5)                            |
+| Stock            | integer | Yes      | Available stock quantity                        |
+
 <!-- PRODUCT_SCHEMA_TABLE:END -->
 
 This table is generated from `src/assets/product-mapping.ts` (`PRODUCT_FIELD_MAPPINGS`) and checked against it by `tests/docs/readme-product-schema.test.ts`; if you change the mapping, regenerate the table with the same source before committing.
