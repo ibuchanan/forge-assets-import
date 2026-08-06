@@ -260,7 +260,5 @@ $RECYCLE.BIN/
 # Test coverage
 coverage/
 
-# Atlassians must ignore the package-lock.json because it gets poluted with Atlassian's proxy for npm
-package-lock.json
 # CocoIndex Code (ccc)
 /.cocoindex_code/
